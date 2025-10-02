@@ -1,0 +1,37 @@
+export const ISO_ERROR_CODES: Record<string, string> = {
+  '00': 'Transacción Aprobada',
+  '01': 'Transacción no Aprobada',
+  '05': 'Tarjeta sin Fondos',
+  '12': 'Transacción Inválida',
+  '13': 'Monto Inválido',
+  '14': 'Número de Tarjeta Inválido',
+  '19': 'Error en el Sistema',
+  '30': 'Error de Formato',
+  '41': 'Tarjeta Perdida',
+  '43': 'Tarjeta Robada',
+  '51': 'Fondos Insuficientes',
+  '54': 'Tarjeta Expirada',
+  '55': 'PIN Incorrecto',
+  '57': 'Transacción no Permitida',
+  '58': 'Transacción no Permitida para Terminal',
+  '61': 'Excede Límite de Retiro',
+  '62': 'Tarjeta Restringida',
+  '63': 'Violación de Seguridad',
+  '65': 'Excede Límite de Frecuencia',
+  '75': 'Excede Límite de Intentos PIN',
+  '76': 'Reversión no Localizada',
+  '78': 'Cuenta no Existe',
+  '82': 'Tiempo de Respuesta Excedido',
+  '83': 'Error de Validación',
+  '85': 'No hay Razón para Denegar',
+  '89': 'Terminal no Habilitada',
+  '91': 'Emisor no Disponible',
+  '92': 'Destino no Localizado',
+  '93': 'Transacción Duplicada',
+  '94': 'Archivo no Actualizado',
+  '96': 'Error en el Sistema',
+};
+
+export function getIsoErrorMessage(code: string): string {
+  return ISO_ERROR_CODES[code] || `Código ISO: ${code}`;
+}
