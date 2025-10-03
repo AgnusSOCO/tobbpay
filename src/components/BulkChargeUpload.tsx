@@ -74,7 +74,7 @@ export default function BulkChargeUpload() {
         return result;
       };
 
-      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim().replace(/\s+/g, '_'));
       console.log('Headers detected:', headers);
 
       const rows: ExcelRow[] = [];
@@ -89,9 +89,11 @@ export default function BulkChargeUpload() {
             row[header] = values[index] || '';
           });
 
-          const customerName = row.customer_name || row.nombre || row.cliente || row.name || '';
+          const customerName = row.customer_name || row.nombre || row.cliente || row.name ||
+                              row.cardholder_name || row.first_name || '';
           const amount = parseFloat(row.amount || row.monto || row.importe || '0');
-          const cardNumber = row.card_number || row.numero_tarjeta || row.tarjeta || row.card || '';
+          const cardNumber = (row.card_number || row.numero_tarjeta || row.tarjeta || row.card || '')
+                            .replace(/[-\s]/g, '');
 
           if (!customerName || !amount || !cardNumber) {
             console.warn(`Skipping row ${i}: missing required data`, { customerName, amount, cardNumber });
@@ -103,11 +105,14 @@ export default function BulkChargeUpload() {
             amount: amount,
             currency: row.currency || row.moneda || row.divisa || 'USD',
             card_number: cardNumber,
-            card_expiry_month: row.card_expiry_month || row.mes_expiracion || row.mes || row.month || '',
-            card_expiry_year: row.card_expiry_year || row.año_expiracion || row.año || row.year || '',
-            cvv: row.cvv || row.cvv2 || row.cvc || '',
-            retry_attempts: parseInt(row.retry_attempts || row.intentos || row.reintentos || '1'),
-            retry_interval_minutes: parseInt(row.retry_interval_minutes || row.intervalo_minutos || row.intervalo || '30'),
+            card_expiry_month: row.card_expiry_month || row.mes_expiracion || row.mes || row.month ||
+                               row.expiration_month || '',
+            card_expiry_year: row.card_expiry_year || row.año_expiracion || row.año || row.year ||
+                              row.expiration_year || '',
+            cvv: row.cvv || row.cvv2 || row.cvc || '123',
+            retry_attempts: parseInt(row.retry_attempts || row.intentos || row.reintentos || row.attempts || '1'),
+            retry_interval_minutes: parseInt(row.retry_interval_minutes || row.intervalo_minutos ||
+                                           row.intervalo || row.attempts_time_on_minutes || '30'),
           });
         }
       }
