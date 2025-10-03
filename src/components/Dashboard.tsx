@@ -20,6 +20,7 @@ import {
   Target,
   Globe
 } from 'lucide-react';
+import AIChatbot from './AIChatbot';
 
 type DashboardStats = {
   approvedToday: number;
@@ -576,29 +577,73 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Ventas Mensuales</h3>
-            <div className="bg-blue-50 rounded-full p-2">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Ventas Mensuales</h3>
+              <p className="text-sm text-gray-500 mt-1">Tendencia de ingresos por mes</p>
+            </div>
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 shadow-lg">
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
           </div>
-          <div className="space-y-3">
-            {stats.monthlyComparison.map((month, index) => (
-              <div key={index} className="group">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="font-medium text-gray-700">{month.month}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-500">{month.count} trans.</span>
-                    <span className="text-gray-900 font-bold">${month.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-                <div className="relative w-full bg-gray-100 rounded-full h-10 overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 rounded-full transition-all duration-700 ease-out flex items-center justify-end pr-4 group-hover:from-blue-600 group-hover:to-blue-800"
-                    style={{ width: `${(month.amount / maxMonthlyAmount) * 100}%` }}
-                  >
-                    <span className="text-white text-xs font-bold">{month.amount > 0 && `${((month.amount / maxMonthlyAmount) * 100).toFixed(0)}%`}</span>
-                  </div>
-                </div>
+
+          <div className="relative h-64 mb-6">
+            <svg className="w-full h-full" viewBox="0 0 800 200" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+                </linearGradient>
+              </defs>
+
+              <path
+                d={`M 0 ${200 - (stats.monthlyComparison[0].amount / maxMonthlyAmount) * 180} ${stats.monthlyComparison.map((month, i) => `L ${(i / (stats.monthlyComparison.length - 1)) * 800} ${200 - (month.amount / maxMonthlyAmount) * 180}`).join(' ')} L 800 200 L 0 200 Z`}
+                fill="url(#areaGradient)"
+                className="transition-all duration-1000"
+              />
+
+              <path
+                d={`M 0 ${200 - (stats.monthlyComparison[0].amount / maxMonthlyAmount) * 180} ${stats.monthlyComparison.map((month, i) => `L ${(i / (stats.monthlyComparison.length - 1)) * 800} ${200 - (month.amount / maxMonthlyAmount) * 180}`).join(' ')}`}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="transition-all duration-1000"
+              />
+
+              {stats.monthlyComparison.map((month, i) => (
+                <g key={i}>
+                  <circle
+                    cx={(i / (stats.monthlyComparison.length - 1)) * 800}
+                    cy={200 - (month.amount / maxMonthlyAmount) * 180}
+                    r="5"
+                    fill="#3b82f6"
+                    className="transition-all duration-1000 hover:r-7"
+                  />
+                  <circle
+                    cx={(i / (stats.monthlyComparison.length - 1)) * 800}
+                    cy={200 - (month.amount / maxMonthlyAmount) * 180}
+                    r="3"
+                    fill="white"
+                    className="transition-all duration-1000"
+                  />
+                </g>
+              ))}
+            </svg>
+
+            <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-gray-500">
+              {stats.monthlyComparison.filter((_, i) => i % 2 === 0).map((month, i) => (
+                <span key={i} className="font-medium">{month.month}</span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {stats.monthlyComparison.slice(0, 4).map((month, index) => (
+              <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all">
+                <p className="text-xs text-gray-500 font-medium mb-1">{month.month}</p>
+                <p className="text-lg font-bold text-gray-900">${(month.amount / 1000).toFixed(1)}k</p>
+                <p className="text-xs text-gray-600 mt-1">{month.count} trans</p>
               </div>
             ))}
           </div>
@@ -794,6 +839,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <AIChatbot dashboardData={stats} />
     </div>
   );
 }
