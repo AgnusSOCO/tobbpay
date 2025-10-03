@@ -11,7 +11,14 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  Filter,
+  Zap,
+  Target,
+  Globe
 } from 'lucide-react';
 
 type DashboardStats = {
@@ -27,6 +34,13 @@ type DashboardStats = {
   totalTransactions: number;
   pendingCharges: number;
   topErrors: { code: string; message: string; count: number }[];
+  recentActivity: Transaction[];
+  currencyBreakdown: { currency: string; amount: number; count: number }[];
+  dailyComparison: { day: string; amount: number; count: number }[];
+  peakHour: number;
+  conversionRate: number;
+  yesterdayApproved: number;
+  lastWeekTotal: number;
 };
 
 export default function Dashboard() {
@@ -43,19 +57,33 @@ export default function Dashboard() {
     totalTransactions: 0,
     pendingCharges: 0,
     topErrors: [],
+    recentActivity: [],
+    currencyBreakdown: [],
+    dailyComparison: [],
+    peakHour: 0,
+    conversionRate: 0,
+    yesterdayApproved: 0,
+    lastWeekTotal: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d');
 
   useEffect(() => {
     loadDashboardData();
     const interval = setInterval(loadDashboardData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timeRange]);
 
   const loadDashboardData = async () => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const lastWeek = new Date(today);
+      lastWeek.setDate(lastWeek.getDate() - 7);
 
       const [transactionsResult, scheduledResult] = await Promise.all([
         supabase.from('transactions').select('*').order('transaction_date', { ascending: false }),
@@ -69,7 +97,18 @@ export default function Dashboard() {
         (t: Transaction) => new Date(t.transaction_date) >= today
       );
 
+      const yesterdayTransactions = transactions.filter(
+        (t: Transaction) => new Date(t.transaction_date) >= yesterday && new Date(t.transaction_date) < today
+      );
+
+      const lastWeekTransactions = transactions.filter(
+        (t: Transaction) => new Date(t.transaction_date) >= lastWeek
+      );
+
       const approvedToday = todayTransactions.filter((t: Transaction) => t.status === 'approved').length;
+      const yesterdayApproved = yesterdayTransactions.filter((t: Transaction) => t.status === 'approved').length;
+      const lastWeekTotal = lastWeekTransactions.filter((t: Transaction) => t.status === 'approved').length;
+
       const salesAmountToday = todayTransactions
         .filter((t: Transaction) => t.status === 'approved')
         .reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
@@ -80,6 +119,7 @@ export default function Dashboard() {
 
       const approvalRate = (approved / total) * 100;
       const rejectionRate = (rejected / total) * 100;
+      const conversionRate = (approved / (approved + pendingCharges || 1)) * 100;
 
       const totalAmount = transactions
         .filter((t: Transaction) => t.status === 'approved')
@@ -89,6 +129,9 @@ export default function Dashboard() {
       const monthlyData = calculateMonthlyComparison(transactions);
       const hourlyData = calculateHourlyStats(todayTransactions);
       const weeklyData = calculateWeeklyTrend(transactions);
+      const dailyData = calculateDailyComparison(transactions);
+
+      const peakHour = hourlyData.reduce((max, curr) => curr.count > max.count ? curr : max, { hour: 0, count: 0 }).hour;
 
       const bankCounts = transactions.reduce((acc: Record<string, { count: number; amount: number }>, t: Transaction) => {
         if (t.bank_name && t.status === 'approved') {
@@ -106,6 +149,21 @@ export default function Dashboard() {
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 5);
 
+      const currencyCounts = transactions.reduce((acc: Record<string, { amount: number; count: number }>, t: Transaction) => {
+        if (t.status === 'approved') {
+          if (!acc[t.currency]) {
+            acc[t.currency] = { amount: 0, count: 0 };
+          }
+          acc[t.currency].amount += Number(t.amount);
+          acc[t.currency].count++;
+        }
+        return acc;
+      }, {});
+
+      const currencyBreakdown = Object.entries(currencyCounts)
+        .map(([currency, data]) => ({ currency, ...data }))
+        .sort((a, b) => b.amount - a.amount);
+
       const errorCounts = transactions
         .filter((t: Transaction) => t.status === 'rejected' && t.iso_code)
         .reduce((acc: Record<string, { message: string; count: number }>, t: Transaction) => {
@@ -122,6 +180,8 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
+      const recentActivity = transactions.slice(0, 10);
+
       setStats({
         approvedToday,
         salesAmountToday,
@@ -135,6 +195,13 @@ export default function Dashboard() {
         totalTransactions: total,
         pendingCharges,
         topErrors,
+        recentActivity,
+        currencyBreakdown,
+        dailyComparison: dailyData,
+        peakHour,
+        conversionRate,
+        yesterdayApproved,
+        lastWeekTotal,
       });
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -203,6 +270,31 @@ export default function Dashboard() {
     }));
   };
 
+  const calculateDailyComparison = (transactions: Transaction[]) => {
+    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const dailyData: Record<number, { amount: number; count: number }> = {};
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    transactions
+      .filter((t: Transaction) => t.status === 'approved' && new Date(t.transaction_date) >= sevenDaysAgo)
+      .forEach((t: Transaction) => {
+        const dayIndex = new Date(t.transaction_date).getDay();
+        if (!dailyData[dayIndex]) {
+          dailyData[dayIndex] = { amount: 0, count: 0 };
+        }
+        dailyData[dayIndex].amount += Number(t.amount);
+        dailyData[dayIndex].count++;
+      });
+
+    return days.map((day, index) => ({
+      day,
+      amount: dailyData[index]?.amount || 0,
+      count: dailyData[index]?.count || 0,
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -216,21 +308,41 @@ export default function Dashboard() {
 
   const maxMonthlyAmount = Math.max(...stats.monthlyComparison.map(m => m.amount), 1);
   const maxHourlyCount = Math.max(...stats.hourlyStats.map(h => h.count), 1);
-  const maxWeeklyCount = Math.max(
-    ...stats.weeklyTrend.map(d => Math.max(d.approved, d.rejected)),
-    1
-  );
+  const maxDailyAmount = Math.max(...stats.dailyComparison.map(d => d.amount), 1);
+
+  const growthVsYesterday = stats.yesterdayApproved > 0
+    ? ((stats.approvedToday - stats.yesterdayApproved) / stats.yesterdayApproved) * 100
+    : 0;
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Resumen de actividad en tiempo real</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Activity className="w-4 h-4 animate-pulse text-green-500" />
-          <span>Actualizado hace instantes</span>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-4 py-2 rounded-lg border border-gray-200">
+            <Activity className="w-4 h-4 animate-pulse text-green-500" />
+            <span>Actualizado ahora</span>
+          </div>
+
+          <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
+            {(['7d', '30d', '90d'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  timeRange === range
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {range === '7d' ? '7 días' : range === '30d' ? '30 días' : '90 días'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -248,8 +360,14 @@ export default function Dashboard() {
             <p className="text-emerald-100 text-sm font-medium">Transacciones Aprobadas</p>
             <p className="text-4xl font-bold mt-2">{stats.approvedToday}</p>
             <div className="mt-3 flex items-center gap-2 text-sm">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-emerald-100">Exitosas</span>
+              {growthVsYesterday >= 0 ? (
+                <ArrowUpRight className="w-4 h-4" />
+              ) : (
+                <ArrowDownRight className="w-4 h-4" />
+              )}
+              <span className="text-emerald-100">
+                {Math.abs(growthVsYesterday).toFixed(1)}% vs ayer
+              </span>
             </div>
           </div>
         </div>
@@ -268,7 +386,7 @@ export default function Dashboard() {
             <p className="text-4xl font-bold mt-2">${stats.salesAmountToday.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             <div className="mt-3 flex items-center gap-2 text-sm">
               <BarChart3 className="w-4 h-4" />
-              <span className="text-orange-100">Total procesado</span>
+              <span className="text-orange-100">Promedio: ${stats.averageTransaction.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -278,16 +396,16 @@ export default function Dashboard() {
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <TrendingUp className="w-10 h-10" />
+              <Target className="w-10 h-10" />
               <div className="bg-white bg-opacity-20 rounded-full px-3 py-1 text-xs font-semibold">
-                GLOBAL
+                TASA
               </div>
             </div>
-            <p className="text-blue-100 text-sm font-medium">Tasa de Aprobación</p>
-            <p className="text-4xl font-bold mt-2">{stats.approvalRate.toFixed(1)}%</p>
+            <p className="text-blue-100 text-sm font-medium">Conversión</p>
+            <p className="text-4xl font-bold mt-2">{stats.conversionRate.toFixed(1)}%</p>
             <div className="mt-3 flex items-center gap-2 text-sm">
-              <Activity className="w-4 h-4" />
-              <span className="text-blue-100">{stats.totalTransactions} transacciones</span>
+              <Zap className="w-4 h-4" />
+              <span className="text-blue-100">Aprobación: {stats.approvalRate.toFixed(1)}%</span>
             </div>
           </div>
         </div>
@@ -299,15 +417,93 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <Clock className="w-10 h-10" />
               <div className="bg-white bg-opacity-20 rounded-full px-3 py-1 text-xs font-semibold">
-                PENDIENTE
+                PICO
               </div>
             </div>
-            <p className="text-purple-100 text-sm font-medium">Cargos Programados</p>
-            <p className="text-4xl font-bold mt-2">{stats.pendingCharges}</p>
+            <p className="text-purple-100 text-sm font-medium">Hora Pico</p>
+            <p className="text-4xl font-bold mt-2">{stats.peakHour}:00</p>
             <div className="mt-3 flex items-center gap-2 text-sm">
-              <CreditCard className="w-4 h-4" />
-              <span className="text-purple-100">En espera</span>
+              <Activity className="w-4 h-4" />
+              <span className="text-purple-100">{stats.pendingCharges} pendientes</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Comparación Diaria (7 días)</h3>
+            <div className="bg-emerald-50 rounded-full p-2">
+              <Calendar className="w-5 h-5 text-emerald-600" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            {stats.dailyComparison.map((day, index) => (
+              <div key={index} className="group">
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="font-medium text-gray-700 w-16">{day.day}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-gray-500 text-xs">{day.count} trans.</span>
+                    <span className="text-gray-900 font-bold">${day.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+                <div className="relative w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-full transition-all duration-700 ease-out group-hover:from-emerald-500 group-hover:to-emerald-700 flex items-center justify-end pr-2"
+                    style={{ width: `${(day.amount / maxDailyAmount) * 100}%` }}
+                  >
+                    {day.amount > maxDailyAmount * 0.2 && (
+                      <span className="text-white text-xs font-bold">{((day.amount / maxDailyAmount) * 100).toFixed(0)}%</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Actividad Reciente</h3>
+            <div className="bg-blue-50 rounded-full p-2">
+              <Activity className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {stats.recentActivity.length > 0 ? (
+              stats.recentActivity.map((transaction, index) => (
+                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    transaction.status === 'approved' ? 'bg-emerald-100' :
+                    transaction.status === 'rejected' ? 'bg-red-100' : 'bg-yellow-100'
+                  }`}>
+                    {transaction.status === 'approved' ? (
+                      <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    ) : transaction.status === 'rejected' ? (
+                      <XCircle className="w-5 h-5 text-red-600" />
+                    ) : (
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{transaction.customer_name}</p>
+                    <p className="text-xs text-gray-500">${transaction.amount.toFixed(2)} {transaction.currency}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(transaction.transaction_date).toLocaleTimeString('es-MX', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <Activity className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">Sin actividad reciente</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -326,7 +522,7 @@ export default function Dashboard() {
                 <div className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-300 hover:from-blue-600 hover:to-blue-500 relative group-hover:shadow-lg"
                   style={{ height: `${(hour.count / maxHourlyCount) * 100}%`, minHeight: hour.count > 0 ? '4px' : '0' }}
                 >
-                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                     {hour.count} transacciones
                   </div>
                 </div>
@@ -338,37 +534,41 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Tendencia Semanal</h3>
-            <div className="bg-emerald-50 rounded-full p-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-xl font-bold text-gray-900">Distribución por Moneda</h3>
+            <div className="bg-purple-50 rounded-full p-2">
+              <Globe className="w-5 h-5 text-purple-600" />
             </div>
           </div>
           <div className="space-y-4">
-            {stats.weeklyTrend.map((day, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-gray-700 w-12">{day.day}</span>
-                  <div className="flex gap-4 text-xs">
-                    <span className="text-emerald-600">{day.approved} ✓</span>
-                    <span className="text-red-600">{day.rejected} ✗</span>
+            {stats.currencyBreakdown.length > 0 ? (
+              stats.currencyBreakdown.map((currency, index) => (
+                <div key={index} className="group">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md">
+                        {currency.currency}
+                      </div>
+                      <span className="font-medium text-gray-700">{currency.currency}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">${currency.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-xs text-gray-500">{currency.count} trans.</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-700 group-hover:from-purple-600 group-hover:to-purple-700"
+                      style={{ width: `${(currency.amount / stats.currencyBreakdown[0].amount) * 100}%` }}
+                    />
                   </div>
                 </div>
-                <div className="flex gap-1 h-8">
-                  <div
-                    className="bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-l transition-all duration-300 hover:from-emerald-500 hover:to-emerald-600 flex items-center justify-center text-white text-xs font-semibold"
-                    style={{ width: `${(day.approved / (day.approved + day.rejected || 1)) * 100}%` }}
-                  >
-                    {day.approved > 0 && day.approved}
-                  </div>
-                  <div
-                    className="bg-gradient-to-r from-red-400 to-red-500 rounded-r transition-all duration-300 hover:from-red-500 hover:to-red-600 flex items-center justify-center text-white text-xs font-semibold"
-                    style={{ width: `${(day.rejected / (day.approved + day.rejected || 1)) * 100}%` }}
-                  >
-                    {day.rejected > 0 && day.rejected}
-                  </div>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <Globe className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No hay datos disponibles</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -582,8 +782,8 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-white bg-opacity-10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
               <TrendingUp className="w-8 h-8" />
             </div>
-            <p className="text-3xl font-bold mb-1">{stats.approvalRate.toFixed(1)}%</p>
-            <p className="text-slate-400 text-sm">Tasa Éxito</p>
+            <p className="text-3xl font-bold mb-1">{stats.lastWeekTotal}</p>
+            <p className="text-slate-400 text-sm">Última Semana</p>
           </div>
           <div className="text-center">
             <div className="w-16 h-16 bg-white bg-opacity-10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
