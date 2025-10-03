@@ -34,37 +34,89 @@ export default function BulkChargeUpload() {
     setMessage('');
 
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
+      let text = await file.text();
+
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.substring(1);
+      }
+
+      const lines = text.split(/\r?\n/).filter(line => line.trim());
 
       if (lines.length < 2) {
         throw new Error('El archivo debe contener al menos una fila de datos');
       }
 
-      const headers = lines[0].split(',').map(h => h.trim());
+      let delimiter = ',';
+      if (lines[0].includes('\t')) {
+        delimiter = '\t';
+      } else if (lines[0].split(',').length < 3 && lines[0].includes(';')) {
+        delimiter = ';';
+      }
+
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === delimiter && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+      console.log('Headers detected:', headers);
+
       const rows: ExcelRow[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        if (values.length === headers.length) {
+        const values = parseCSVLine(lines[i]);
+        console.log(`Row ${i}:`, values);
+
+        if (values.length >= 3) {
           const row: any = {};
           headers.forEach((header, index) => {
-            row[header] = values[index];
+            row[header] = values[index] || '';
           });
 
+          const customerName = row.customer_name || row.nombre || row.cliente || row.name || '';
+          const amount = parseFloat(row.amount || row.monto || row.importe || '0');
+          const cardNumber = row.card_number || row.numero_tarjeta || row.tarjeta || row.card || '';
+
+          if (!customerName || !amount || !cardNumber) {
+            console.warn(`Skipping row ${i}: missing required data`, { customerName, amount, cardNumber });
+            continue;
+          }
+
           rows.push({
-            customer_name: row.customer_name || row.nombre || '',
-            amount: parseFloat(row.amount || row.monto || '0'),
-            currency: row.currency || row.moneda || 'USD',
-            card_number: row.card_number || row.numero_tarjeta || '',
-            card_expiry_month: row.card_expiry_month || row.mes_expiracion || '',
-            card_expiry_year: row.card_expiry_year || row.año_expiracion || '',
-            cvv: row.cvv || '',
-            retry_attempts: parseInt(row.retry_attempts || row.intentos || '1'),
-            retry_interval_minutes: parseInt(row.retry_interval_minutes || row.intervalo_minutos || '30'),
+            customer_name: customerName,
+            amount: amount,
+            currency: row.currency || row.moneda || row.divisa || 'USD',
+            card_number: cardNumber,
+            card_expiry_month: row.card_expiry_month || row.mes_expiracion || row.mes || row.month || '',
+            card_expiry_year: row.card_expiry_year || row.año_expiracion || row.año || row.year || '',
+            cvv: row.cvv || row.cvv2 || row.cvc || '',
+            retry_attempts: parseInt(row.retry_attempts || row.intentos || row.reintentos || '1'),
+            retry_interval_minutes: parseInt(row.retry_interval_minutes || row.intervalo_minutos || row.intervalo || '30'),
           });
         }
       }
+
+      if (rows.length === 0) {
+        throw new Error('No se encontraron filas válidas. Verifique que el archivo tenga los datos correctos.');
+      }
+
+      console.log('Parsed rows:', rows);
 
       const scheduledCharges = rows.map(row => ({
         batch_name: batchName,
@@ -89,11 +141,12 @@ export default function BulkChargeUpload() {
 
       if (error) throw error;
 
-      setMessage(`Se cargaron exitosamente ${rows.length} registros`);
+      setMessage(`Se cargaron exitosamente ${rows.length} registros al lote "${batchName}"`);
       setMessageType('success');
       setBatchName('');
       e.target.value = '';
     } catch (error: any) {
+      console.error('Upload error:', error);
       setMessage(error.message || 'Error al procesar el archivo');
       setMessageType('error');
     } finally {
@@ -102,9 +155,10 @@ export default function BulkChargeUpload() {
   };
 
   const downloadTemplate = () => {
-    const template = `customer_name,amount,currency,card_number,card_expiry_month,card_expiry_year,cvv,retry_attempts,retry_interval_minutes
+    const template = `cliente,monto,currency,card_number,mes,año,cvv,intentos,intervalo
 Juan Pérez,100.00,USD,4111111111111111,12,2025,123,3,30
-María García,250.50,USD,5555555555554444,06,2026,456,2,60`;
+María García,250.50,USD,5555555555554444,06,2026,456,2,60
+Carlos López,175.00,MXN,4111111111111111,03,2027,789,1,30`;
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -187,9 +241,12 @@ María García,250.50,USD,5555555555554444,06,2026,456,2,60`;
         <div className="mt-6 p-4 bg-blue-50 rounded-md">
           <h3 className="font-medium text-blue-900 mb-2">Formato del archivo:</h3>
           <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Archivo CSV o Excel (.csv, .xlsx, .xls)</li>
+            <li>• Archivo CSV (.csv)</li>
             <li>• Primera fila: encabezados de columnas</li>
-            <li>• Columnas requeridas: customer_name, amount, currency, card_number, card_expiry_month, card_expiry_year, cvv, retry_attempts, retry_interval_minutes</li>
+            <li>• Columnas requeridas (mínimo): cliente/nombre, monto/amount, card_number/tarjeta</li>
+            <li>• Columnas opcionales: mes, año, cvv, currency/moneda, intentos, intervalo</li>
+            <li>• Soporta delimitadores: coma (,), punto y coma (;), o tabulación</li>
+            <li>• Los encabezados pueden estar en español o inglés</li>
           </ul>
         </div>
       </div>
