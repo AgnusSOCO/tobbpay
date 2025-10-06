@@ -182,9 +182,10 @@ const Upload = () => {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          El archivo Excel debe contener las siguientes columnas: Número de tarjeta, Mes de expiración, Año de expiración, 
-          Nombre del titular, Nombre, Apellido, Correo electrónico, Dirección, Ciudad, País, Importe, 
-          Moneda, Fecha de inicio, Hora, Intentos, Tiempo entre intentos (minutos), Movimiento y Referencia.
+          NÚMERO DE TARJETA, FECHA DE VENCIMIENTO, MES, AÑO DE VENCIMIENTO, NOMBRE 
+          DEL TITULAR DE LA TARJETA, NOMBRE, APELLIDO, CORREO ELECTRÓNICO, DIRECCIÓN, 
+          CIUDAD, PAÍS, MONTO, MONEDA, FECHA DE INICIO, HORA, INTENTOS, TIEMPO DE 
+          INTENTOS EN MINUTOS, MOVIMIENTO, REFERENCIA
         </AlertDescription>
       </Alert>
 
