@@ -183,7 +183,7 @@ const Upload = () => {
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           Excel debe contener: Nombre del cliente, Correo electrónico, Dirección, Ciudad, País,
-          Número de tarjeta, CVV, KUSHKI_TOKEN, BIN, MARCA, Importe, Moneda, Fecha de inicio, Hora,
+          Número de tarjeta, BIN, MARCA, Importe, Moneda, Fecha de inicio, Hora,
           Frecuencia, Intentos, Referencia.
         </AlertDescription>
       </Alert>
