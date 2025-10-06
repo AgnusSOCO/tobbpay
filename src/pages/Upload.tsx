@@ -182,9 +182,9 @@ const Upload = () => {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Excel debe contener: Nombre del cliente, Correo electrónico, Dirección, Ciudad, País,
-          Número de tarjeta, BIN, MARCA, Importe, Moneda, Fecha de inicio, Hora,
-          Frecuencia, Intentos, Referencia.
+          El archivo Excel debe contener las siguientes columnas: Número de tarjeta, Mes de expiración, Año de expiración, 
+          Nombre del titular, Nombre, Apellido, Correo electrónico, Dirección, Ciudad, País, Importe, 
+          Moneda, Fecha de inicio, Hora, Intentos, Tiempo entre intentos (minutos), Movimiento y Referencia.
         </AlertDescription>
       </Alert>
 
