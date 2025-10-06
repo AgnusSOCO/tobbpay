@@ -1,138 +1,123 @@
-# TOBB Payment Platform
+# TOBB_PAYFLOW
 
-Plataforma de pagos electrónicos que reemplaza a Bluemon y se conecta directamente con Kushki para procesar cobros masivos.
+**TOBB_PAYFLOW** is a payment collection management platform built to replace Bluemon’s electronic collection system.  
+It streamlines the bulk collection process between **TOBB** and **Kushki**, offering automated transactions, real-time status tracking, and visual analytics through a clean and modern web interface.
 
-## Características Principales
+---
 
-### 1. Dashboard con Reportes
-- Transacciones aprobadas del día
-- Monto de ventas del día
-- Gráfico comparativo de ventas por mes
-- Gráfico de porcentaje de aceptación/rechazo
-- Gráfico de aceptación por banco
+## Tech Stack
 
-### 2. Gestión de Transacciones
-- Lista completa de todas las transacciones
-- Filtros: Todas, Aprobadas, Rechazadas
-- Buscador por cliente, banco, número de tarjeta
-- Visualización de códigos ISO con mensajes descriptivos
-- Exportación de reportes en CSV
-- Actualización en tiempo real
+**Frontend**
 
-### 3. Carga Masiva de Cobros
-- Carga de archivos Excel/CSV con datos bancarios
-- Configuración de reintentos automáticos
-- Configuración de intervalos entre reintentos
-- Validación de formato de archivo
+- [Vite](https://vitejs.dev/)
+- [React (TypeScript)](https://react.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
 
-### 4. Cargos Programados
-- Visualización de todos los cargos pendientes
-- Ejecución manual de cobros
-- Reintentos automáticos según configuración
-- Estado de cada cargo (pendiente, procesando, completado, fallido)
-- Gestión de lotes de cobros
+**Backend / Database**
 
-### 5. Integración con Kushki
-- Conexión directa mediante Edge Functions
-- Tokenización de tarjetas
-- Procesamiento de pagos recurrentes
-- Manejo de códigos de error ISO
-- Registro completo de transacciones
+- [Supabase](https://supabase.com/)
 
-## Estructura de la Base de Datos
+---
 
-### Tabla: users
-- Gestión de usuarios del sistema
-- Autenticación con Supabase Auth
+## Integrated APIs (KUSHKI)
 
-### Tabla: transactions
-- Registro de todas las transacciones procesadas
-- Incluye información del cliente, banco, tarjeta
-- Códigos ISO con mensajes descriptivos
-- Estado de cada transacción
+The following **Kushki APIs** are integrated to handle transactions and status verification:
 
-### Tabla: scheduled_charges
-- Cargos programados para ejecución
-- Configuración de reintentos
-- Tracking de intentos realizados
-- Estado y próxima ejecución
+1. **Get Recurring Charge Token API**  
+   → Request a recurring charge token that can later be used to create a recurring charge of a customer using the /subscriptions/v1/card endpoint.
+   `GET https://api-uat.kushkipagos.com/subscriptions/v1/card/tokens`
 
-## Tecnologías Utilizadas
+2. **Create a recurring charge**
+   → Create a recurring charge with a token provided by Kushki which represents the customer's credit card.
+   `POST https://api-uat.kushkipagos.com/subscriptions/v1/card`
 
-- **Frontend**: React + TypeScript + Vite
-- **Estilos**: TailwindCSS
-- **Base de Datos**: Supabase PostgreSQL
-- **Autenticación**: Supabase Auth
-- **Backend**: Supabase Edge Functions
-- **Procesamiento de Pagos**: Kushki API
+3. **Cancel a recurring charge**
+   → Cancel a recurring charge identified by its subscriptionId.
+   `DELETE https://api-uat.kushkipagos.com/subscriptions/v1/card/{subscriptionId}`
 
-## Formato de Archivo para Carga Masiva
+4. **Get Transactions List v2 API**  
+   → Retrieve a paginated list of transactions for a specific merchant using the Get Transaction List v2 API. This version supports both card-present and card-not-present transactions, as well as filtering by pay-ins and pay-outs. Transactions are returned in descending order, with the most recent ones appearing first.  
+   `GET https://api-uat.kushkipagos.com/analytics/v2/transactions-list`
 
-El archivo CSV debe contener las siguientes columnas:
+---
 
-```csv
-customer_name,amount,currency,card_number,card_expiry_month,card_expiry_year,cvv,retry_attempts,retry_interval_minutes
-```
+## Project Overview
 
-### Ejemplo:
-```csv
-customer_name,amount,currency,card_number,card_expiry_month,card_expiry_year,cvv,retry_attempts,retry_interval_minutes
-Juan Pérez,100.00,USD,4111111111111111,12,2025,123,3,30
-María García,250.50,USD,5555555555554444,06,2026,456,2,60
-```
+### Purpose
 
-### Descripción de Campos:
-- **customer_name**: Nombre completo del cliente
-- **amount**: Monto a cobrar
-- **currency**: Moneda (USD, MXN, etc.)
-- **card_number**: Número de tarjeta completo
-- **card_expiry_month**: Mes de expiración (01-12)
-- **card_expiry_year**: Año de expiración (YYYY)
-- **cvv**: Código de seguridad
-- **retry_attempts**: Número de reintentos si falla
-- **retry_interval_minutes**: Minutos entre cada reintento
+The purpose of this project is to **replace Bluemon's existing electronic collection system**, which currently acts as a middleware between **TOBB** and **Kushki** for payment collection.
 
-## Códigos ISO Implementados
+Currently, TOBB uploads customer banking information via an Excel spreadsheet to the Bluemon platform. The platform then connects to Kushki to process payments, displaying the results (approved, pending, rejected, etc.) along with each person’s banking details.
 
-El sistema traduce automáticamente los códigos ISO a mensajes descriptivos:
+The new TOBB_PAYFLOW platform replicates and enhances this process — adding automation, analytics, and scheduling functionalities.
 
-- **00**: Transacción Aprobada
-- **05**: Tarjeta sin Fondos
-- **51**: Fondos Insuficientes
-- **54**: Tarjeta Expirada
-- **Y muchos más...**
+---
 
-## Configuración de Kushki
+## Key Features
 
-Para configurar las credenciales de Kushki, debe establecer las siguientes variables de entorno en Supabase:
+### 1. Bulk Upload
 
-1. Ir a Project Settings > Edge Functions
-2. Agregar las siguientes secrets:
-   - `KUSHKI_PUBLIC_KEY`: Tu Public Merchant ID de Kushki
-   - `KUSHKI_PRIVATE_KEY`: Tu Private Merchant ID de Kushki
+- Upload Excel spreadsheets containing customer banking data.
+- Each record can define custom recharge frequencies.
 
-## Flujo de Trabajo
+### 2. Bulk Collections
 
-1. **Carga de datos**: El usuario carga un archivo Excel con la información de los clientes
-2. **Programación**: Los cobros se almacenan como cargos programados
-3. **Ejecución**: Se pueden ejecutar manualmente o automáticamente
-4. **Procesamiento**: El sistema se conecta con Kushki para tokenizar y cobrar
-5. **Registro**: Cada transacción se registra con su estado y detalles
-6. **Reintentos**: Si falla por fondos insuficientes, se reintenta automáticamente
-7. **Reportes**: Todo se visualiza en el dashboard y lista de transacciones
+- Execute mass payment collections directly via Kushki.
 
-## Ventajas sobre Bluemon
+### 3. Status Screen
 
-1. **Costo**: Eliminación del intermediario reduce costos
-2. **Control**: Acceso directo a la información de transacciones
-3. **Personalización**: Interfaz adaptada específicamente para TOBB
-4. **Flexibilidad**: Fácil agregar nuevas funcionalidades
-5. **Transparencia**: Visibilidad completa del proceso de cobro
+- View all transactions in real-time with details such as:
+  - **Approved**, **Rejected**, or **Insufficient Funds**.
 
-## Seguridad
+### 4. Dashboard & Reports
 
-- Autenticación con Supabase Auth
-- Row Level Security (RLS) en todas las tablas
-- Conexión segura con Kushki mediante Edge Functions
-- Las credenciales nunca se exponen en el frontend
-- Almacenamiento seguro de datos sensibles
+- Approved transactions that day
+- Daily approved transactions and total sales amount.
+- Comparative monthly sales graph.
+- Pie chart showing acceptance vs rejection percentage.
+
+### 5. Reports & Downloads
+
+- Download reports in **PDF** or **XLSX** format.
+
+### 6. Smart Tools
+
+- **Search** and **filter** transactions by status.
+- **Update** and **refresh** transactions in real time.
+
+### 7. Scheduled Charges
+
+- Upload Excel files containing **pre-scheduled** charge data.
+- Automate the recurring collection process.
+
+---
+
+## Installation & Setup Guide
+
+1. Install Dependencies
+   npm install
+
+2. Run the Development Server
+
+npm run dev
+
+This will start the app in development mode using Vite.
+
+3. Build for Production
+
+npm run build
+
+4. Preview Production Build
+   npm run preview
+
+5. Lint the Code
+   npm run lint
+
+| Command             | Description                          |
+| ------------------- | ------------------------------------ |
+| `npm run dev`       | Run the project in development mode  |
+| `npm run build`     | Build the project for production     |
+| `npm run build:dev` | Build with development configuration |
+| `npm run preview`   | Preview the production build locally |
+| `npm run lint`      | Run ESLint for code quality checks   |
