@@ -119,7 +119,7 @@ const Transactions = () => {
           item.card_holder_name ||
           'N/A',
         email: item.contact_details?.email || 'N/A',
-        operation: '213123123213',
+        operation: 'N/A',
         amount: (item.approved_transaction_amount ?? item.request_amount ?? 0).toString(),
         currency: item.currency_code || 'N/A',
         status: item.transaction_status,
@@ -177,30 +177,6 @@ const Transactions = () => {
       setTransactions(transformData(res.data));
     }
   };
-
-  const getSubscriptionInfo = async () => {
-    const result = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/dynamic-action`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      body: JSON.stringify({
-        subscriptionId: '1759746628795543',
-      }),
-    });
-
-    const res = result.json();
-
-    console.log('subscription info:', res);
-  };
-
-  // Sample data loader (replace with API fetch)
-  useEffect(() => {
-    setLoading(true);
-    getSubscriptionInfo();
-    setLoading(false);
-  }, []);
 
   // Reactive filtering: search, status, and date range
   useEffect(() => {
@@ -298,11 +274,10 @@ const Transactions = () => {
   useEffect(() => {
     if (!autoReload) return;
 
-    // Then reload every 10 seconds (adjust as needed)
+    // Then reload every 10 mins
     const timer = setInterval(() => {
-      // fetchTransactions();
-      // console.log(1);
-    }, 1000);
+      fetchTransactions();
+    }, 10000);
 
     return () => clearInterval(timer);
   }, [autoReload]);
