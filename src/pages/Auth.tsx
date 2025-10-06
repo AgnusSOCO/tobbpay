@@ -97,7 +97,7 @@ const Auth = () => {
               <CreditCard className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center"> $Colección TOBB/CardTitle </CardTitle>
+          <CardTitle className="text-2xl text-center"> TOBB PAY </CardTitle>
           <CardDescription className="text-center">Plataforma de gestión de cobros</CardDescription>
         </CardHeader>
         <CardContent>
