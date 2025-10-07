@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -61,7 +60,7 @@ const Schedules = () => {
   const [searchTerm, setSearchTerm] = useState('');
   // Pagination state
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10); // rows per page
+  const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
@@ -72,7 +71,6 @@ const Schedules = () => {
     setLoading(true);
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
-
     const { data, error, count } = await supabase
       .from('schedules')
       .select(
@@ -151,7 +149,7 @@ const Schedules = () => {
                 periodicity: (schedule.frequency || 'monthly').toLowerCase(),
                 contactDetails: {
                   documentType: 'CC',
-                  documentNumber: '1000000000',
+                  documentNumber: 'N/A',
                   email: schedule.email,
                   firstName: schedule.first_name || 'First',
                   lastName: schedule.last_name || 'Last',
@@ -199,8 +197,6 @@ const Schedules = () => {
             }),
           }
         );
-
-        const inactiveData = await inactiveRes.text();
 
         if (inactiveRes.ok) {
           await supabase
@@ -250,7 +246,6 @@ const Schedules = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <CalendarIcon className="h-8 w-8 text-primary" />
         <div>
           <h1 className="text-3xl font-bold">Cargos programados</h1>
           <p className="text-muted-foreground">Gestione sus pagos recurrentes</p>
@@ -352,7 +347,6 @@ const Schedules = () => {
             </Table>
           </div>
 
-          {/* Pagination Controls */}
           <div className="flex items-center justify-between px-4 py-2">
             <span className="text-sm text-muted-foreground">
               Página {page} de {totalPages}

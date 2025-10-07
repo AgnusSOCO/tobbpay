@@ -172,10 +172,7 @@ const Transactions = () => {
     );
 
     const res = result.json();
-
-    if (res.data) {
-      setTransactions(transformData(res.data));
-    }
+    if (res.data) setTransactions(transformData(res.data));
   };
 
   // Reactive filtering: search, status, and date range
@@ -305,7 +302,34 @@ const Transactions = () => {
         </CardHeader>
         <CardContent>
           {/* Date Pickers */}
-          <div className="flex gap-4 mb-4">
+          <div className="flex gap-4 mb-4 items-center">
+            <div className="flex relative w-full gap-2">
+              <label htmlFor="auto-reload" className="text-sm font-medium text-gray-700">
+                Autorefresco
+              </label>
+              <button
+                id="auto-reload"
+                onClick={() => setAutoReload(!autoReload)}
+                className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+                  autoReload ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                    autoReload ? 'translate-x-4' : ''
+                  }`}
+                ></div>
+              </button>
+            </div>
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, correo electrónico, ticket..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
             <div className="relative w-full">
               <Input
                 readOnly
@@ -346,32 +370,21 @@ const Transactions = () => {
                 </div>
               )}
             </div>
+            <div className="relative w-full">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Estado completo</SelectItem>
+                  <SelectItem value="approved">Aprobado</SelectItem>
+                  <SelectItem value="declined">Rechazado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={fetchTransactions} disabled={loading}>
               {loading ? 'Cargando...' : 'Filtro'}
             </Button>
-          </div>
-
-          {/* Search + Status filter */}
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre, correo electrónico, ticket..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Estado completo</SelectItem>
-                <SelectItem value="approved">Aprobado</SelectItem>
-                <SelectItem value="declined">Rechazado</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Table */}
@@ -379,26 +392,6 @@ const Transactions = () => {
             <Table className="min-w-[1000px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>
-                    <div className="flex items-center space-x-2">
-                      <label htmlFor="auto-reload" className="text-sm font-medium text-gray-700">
-                        Recarga automática
-                      </label>
-                      <button
-                        id="auto-reload"
-                        onClick={() => setAutoReload(!autoReload)}
-                        className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
-                          autoReload ? 'bg-green-500' : 'bg-gray-300'
-                        }`}
-                      >
-                        <div
-                          className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                            autoReload ? 'translate-x-4' : ''
-                          }`}
-                        ></div>
-                      </button>
-                    </div>
-                  </TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Hora</TableHead>
                   <TableHead>Nombre</TableHead>
@@ -429,15 +422,6 @@ const Transactions = () => {
                 ) : (
                   filteredTransactions.map((t, id) => (
                     <TableRow key={id}>
-                      <TableCell>
-                        <div className="inline-flex items-center justify-center h-10 w-10 rounded-full ">
-                          {t.status === 'APPROVED' ? (
-                            <CheckCircle2 className="h-8 w-8 text-green-500 hover:text-green-700 transition-colors" />
-                          ) : (
-                            <XCircle className="h-8 w-8 text-red-500 hover:text-red-700 transition-colors" />
-                          )}
-                        </div>
-                      </TableCell>
                       <TableCell>{t.date}</TableCell>
                       <TableCell>{t.time}</TableCell>
                       <TableCell>{t.name}</TableCell>

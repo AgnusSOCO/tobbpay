@@ -16,10 +16,10 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
 const menuItems = [
-  { title: 'Panel', url: '/dashboard', icon: Home },
-  { title: 'Actas', url: '/transactions', icon: FileText },
+  { title: 'Panel de control', url: '/dashboard', icon: Home },
+  { title: 'Transacciones', url: '/transactions', icon: FileText },
   { title: 'Subir', url: '/upload', icon: Upload },
-  { title: 'Horarios', url: '/schedules', icon: Calendar },
+  { title: 'Calendarios de pago', url: '/schedules', icon: Calendar },
 ];
 
 export function AppSidebar() {
@@ -36,7 +36,6 @@ export function AppSidebar() {
           </div>
           {!collapsed && <span className="font-semibold text-lg">TOBB</span>}
         </div>
-
         <SidebarGroup>
           <SidebarGroupLabel>Menú</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -62,7 +61,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
       <SidebarFooter>
         <Button variant="ghost" className="w-full justify-start" onClick={signOut}>
           <LogOut className="h-4 w-4" />

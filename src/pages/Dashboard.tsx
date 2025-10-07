@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import { TrendingUp, DollarSign, CheckCircle2, XCircle } from 'lucide-react';
 import {
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -29,87 +26,20 @@ const Dashboard = () => {
   const [stats, setStats] = useState({
     todayApproved: 0,
     todaySales: 0,
-    approvalRate: 50,
-    rejectionRate: 50,
+    approvalRate: 0,
+    rejectionRate: 0,
   });
 
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [bankData, setBankData] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-02-04T15:53:45.000Z',
-      metadata: '{"contractID":"157AB"}',
-      approved_transaction_amount: 0,
-      contact_details: {
-        document_code: 'DORJ760623HNGDORJ7',
-        document_type: 'CURP',
-        email: 'user@example.com',
-        first_name: 'John',
-        last_name: 'Doe',
-        phone: '+593912345678',
-      },
-      country: 'Mexico',
-      credential_alias: 'Manuel Mexico',
-      credential_id: 'aa39582ddf0e4fcdad6d91f0caf64e28',
-      currency_code: 'MXN',
-      transaction_status: 'DECLINED',
-      transaction_type: 'SALE',
-      approved_transaction_amount: 10,
-      card_holder_name: 'Jose Perez',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-    },
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-02-04T15:55:37.000Z',
-      approved_transaction_amount: 1000,
-      transaction_status: 'APPROVED',
-      transaction_type: 'SALE',
-      card_holder_name: 'John Doe',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-    },
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-02-04T15:58:44.302Z',
-      approved_transaction_amount: 500,
-      transaction_status: 'APPROVED',
-      transaction_type: 'VOID',
-      card_holder_name: 'John Doe',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-    },
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-01-04T15:55:37.000Z',
-      approved_transaction_amount: 4000,
-      transaction_status: 'APPROVED',
-      transaction_type: 'SALE',
-      card_holder_name: 'John Doe',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-    },
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-04-04T15:55:37.000Z',
-      approved_transaction_amount: 2000,
-      transaction_status: 'APPROVED',
-      transaction_type: 'SALE',
-      card_holder_name: 'John Doe',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-    },
-  ]);
+  const [transactions, setTransactions] = useState<any[]>([]);
 
   const getMonthlySalesTotals = (transactions: Transaction[]) => {
     const monthlyTotals: Record<string, number> = {};
 
-    // Sum approved SALE transactions per month
     transactions.forEach((t) => {
       if (t.transaction_status === 'APPROVED' && t.transaction_type === 'SALE') {
         const date = new Date(t.created);
-        const month = date.getMonth(); // 0–11
+        const month = date.getMonth();
         const amount = t.approved_transaction_amount || 0;
         monthlyTotals[month] = (monthlyTotals[month] || 0) + amount;
       }
@@ -136,7 +66,6 @@ const Dashboard = () => {
     }));
 
     setMonthlyData(allMonths);
-    console.log(allMonths);
   };
 
   useEffect(() => {
@@ -218,7 +147,6 @@ const Dashboard = () => {
         (sum, t) => sum + Number(t.approved_transaction_amount),
         0
       );
-
       const total = transactions.length;
       const approvalRate = total > 0 ? (approved.length / total) * 100 : 0;
       const rejectionRate = total > 0 ? (rejected.length / total) * 100 : 0;
@@ -232,13 +160,6 @@ const Dashboard = () => {
         rejectionRate: Math.round(rejectionRate),
       });
     }
-
-    setBankData([
-      { bank: 'Bank A', accepted: 85 },
-      { bank: 'Bank B', accepted: 78 },
-      { bank: 'Bank C', accepted: 92 },
-      { bank: 'Bank D', accepted: 88 },
-    ]);
   };
 
   const pieData = [
@@ -255,7 +176,6 @@ const Dashboard = () => {
         <p className="text-muted-foreground">Bienvenido a tu plataforma de cobros</p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -302,7 +222,6 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -331,7 +250,6 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Relación aprobación/rechazo</CardTitle>
