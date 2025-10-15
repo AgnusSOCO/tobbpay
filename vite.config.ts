@@ -9,7 +9,8 @@ export default defineConfig(({ mode }) => ({
     host: true, // allow network access (required for ngrok)
     allowedHosts: [
       "localhost",
-      "f545699ff6cb.ngrok-free.app", // your ngrok URL
+      "f545699ff6cb.ngrok-free.app",
+      "a83212c2178c.ngrok-free.app"
     ],
   },
   plugins: [

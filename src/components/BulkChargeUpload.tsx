@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload as UploadIcon, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const Upload = () => {
+const BulkChargeUpload = () => {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -26,8 +26,8 @@ const Upload = () => {
     if (!validTypes.includes(selectedFile.type)) {
       toast({
         variant: 'destructive',
-        title: 'Tipo de archivo no válido',
-        description: 'Suba un archivo Excel (.xls o .xlsx)',
+        title: 'Invalid file type',
+        description: 'Please upload an Excel file (.xls or .xlsx)',
       });
       return;
     }
@@ -39,8 +39,8 @@ const Upload = () => {
     if (!file) {
       toast({
         variant: 'destructive',
-        title: 'No hay ningún archivo seleccionado',
-        description: 'Seleccione un archivo de Excel para cargar.',
+        title: 'No file selected',
+        description: 'Please select an Excel file to upload',
       });
       return;
     }
@@ -54,14 +54,14 @@ const Upload = () => {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error('Usuario no conectado');
+      if (userError || !user) throw new Error('User not logged in');
 
       // 2. Parse Excel
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
-      if (rows.length === 0) throw new Error('El archivo de Excel está vacío');
+      if (rows.length === 0) throw new Error('Excel file is empty');
 
       // 4. Prepare customer payload
       const customersPayload = rows
@@ -131,7 +131,6 @@ const Upload = () => {
           movement: r['MOVEMENT'] || '',
           expiryMonth: r['EXPIRATION MONTH'] || '',
           expiryYear: r['EXPIRATION YEAR'] || '',
-
           first_name: `${r['FIRST NAME'] || ''}`,
           last_name: `${r['LAST NAME'] || ''}`,
           email: r['EMAIL']?.toString().trim() || null,
@@ -153,8 +152,8 @@ const Upload = () => {
 
       const duration = ((performance.now() - startTime) / 1000).toFixed(2);
       toast({
-        title: 'Subida exitosa',
-        description: `${file.name} procesado (${rows.length} entradas) en ${duration}s`,
+        title: 'Upload successful',
+        description: `${file.name} processed (${rows.length} entries) in ${duration}s`,
       });
 
       setFile(null);
@@ -173,9 +172,10 @@ const Upload = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Subir archivo de cobro</h1>
+        <h1 className="text-3xl font-bold">Alta de Archivo de Cargos Programados</h1>
         <p className="text-muted-foreground">
-          Suba un archivo de Excel con la información de pago del cliente.
+          A continuación suba su archivo en formato de Microsoft Excel para dar de alta los cargos
+          programados
         </p>
       </div>
 
@@ -190,7 +190,7 @@ const Upload = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Subir archivo Excel</CardTitle>
+          <CardTitle></CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
@@ -204,7 +204,7 @@ const Upload = () => {
                   </p>
                 </div>
                 <Button variant="outline" onClick={() => setFile(null)}>
-                  Eliminar archivo
+                  Remove File
                 </Button>
               </div>
             ) : (
@@ -212,8 +212,7 @@ const Upload = () => {
                 <UploadIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                 <div>
                   <Label htmlFor="file-upload" className="cursor-pointer">
-                    <span className="text-primary hover:underline">Elige un archivo</span> o
-                    arrástralo
+                    <span className="text-primary hover:underline">Choose a file</span>
                   </Label>
                   <Input
                     id="file-upload"
@@ -223,13 +222,13 @@ const Upload = () => {
                     className="hidden"
                   />
                 </div>
-                <p className="text-sm text-muted-foreground">Soportes: .xls, .xlsx (Máximo 10MB)</p>
+                <p className="text-sm text-muted-foreground">Supports: .xls, .xlsx (Max 10MB)</p>
               </div>
             )}
           </div>
 
           <Button onClick={handleUpload} disabled={!file || uploading} className="w-full">
-            {uploading ? 'Procesando...' : 'Cargar y procesar'}
+            {uploading ? 'Processing...' : 'Upload and Process'}
           </Button>
         </CardContent>
       </Card>
@@ -237,4 +236,4 @@ const Upload = () => {
   );
 };
 
-export default Upload;
+export default BulkChargeUpload;
