@@ -112,167 +112,6 @@ type DashboardStats = {
   lastWeekTotal: number;
 };
 
-// Mock API data
-const mockAPIData: TransactionAPIResponse = {
-  total: 3,
-  data: [
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-02-04T15:53:45.000Z',
-      metadata: '{"contractID":"157AB"}',
-      approved_transaction_amount: 0,
-      contact_details: {
-        document_code: 'DORJ760623HNGDORJ7',
-        document_type: 'CURP',
-        email: 'user@example.com',
-        first_name: 'John',
-        last_name: 'Doe',
-        phone: '+593912345678',
-      },
-      country: 'Mexico',
-      credential_alias: 'Manuel Mexico',
-      credential_id: 'aa39582ddf0e4fcdad6d91f0caf64e28',
-      currency_code: 'MXN',
-      ice_value: 0,
-      iva_value: 0,
-      merchant_id: '20000000106554380000',
-      merchant_name: 'TW Mexico',
-      payment_method: 'CARD',
-      payment_submethod: 'CARD NO PRESENT',
-      processor_name: 'undefined',
-      processor_type: 'aggregator_formal',
-      public_credential_id: 'fc98ad9ee66443588be2873c89217cdd',
-      request_amount: 1000,
-      response_code: 'K220',
-      response_text: 'Monto de la transacción es diferente al monto de la venta inicial',
-      subtotal_iva: 0,
-      subtotal_iva0: 1000,
-      transaction_id: '1738684425593130452',
-      transaction_reference: '1275635a-ad34-4764-a27e-f6215b94b3c7',
-      transaction_status: 'DECLINED',
-      transaction_type: 'SALE',
-      bin_card: '54519515',
-      card_country: 'Ecuador',
-      card_country_code: 'EC',
-      card_holder_name: 'Jose Perez',
-      card_type: 'credit',
-      foreign_card: true,
-      issuing_bank: 'Banco de la Produccion S.A. (PRODUBANCO)',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-      transaction_card_id: '6420c5bd-5a3f-45d2-8ac4-88de7b09958d',
-    },
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-02-04T15:55:37.000Z',
-      metadata: '{"contractID":"157AB"}',
-      approved_transaction_amount: 1000,
-      contact_details: {
-        document_code: 'DORJ760623HNGDORJ7',
-        document_type: 'CURP',
-        email: 'user@example.com',
-        first_name: 'John',
-        last_name: 'Doe',
-        phone: '+523912345678',
-      },
-      country: 'Mexico',
-      credential_alias: 'Alias1',
-      credential_id: '22c33a81f145415cb200ab8139603a51',
-      currency_code: 'MXN',
-      ice_value: 0,
-      iva_value: 0,
-      merchant_id: '20000000106554380000',
-      merchant_name: 'TW Mexico',
-      payment_method: 'CARD',
-      payment_submethod: 'CARD NO PRESENT',
-      processor_id: '6000000000172166121420424728',
-      processor_name: 'Prosa Processor',
-      processor_type: 'gateway',
-      public_credential_id: 'd5713887dc434cc4bb873781e46e10ca',
-      request_amount: 1000,
-      response_code: '000',
-      response_text: 'Transacción aprobada',
-      subtotal_iva: 0,
-      subtotal_iva0: 1000,
-      ticket_number: '029184246439606168',
-      transaction_id: '700011575252919092',
-      transaction_reference: 'aa778d12-c56b-4cc2-86c8-1dea7cebe65e',
-      transaction_status: 'APPROVED',
-      transaction_type: 'SALE',
-      acquirer_bank: 'Afirme',
-      approval_code: '000000',
-      bin_card: '54519515',
-      card_country: 'Ecuador',
-      card_country_code: 'EC',
-      card_holder_name: 'John Doe',
-      card_type: 'credit',
-      foreign_card: true,
-      issuing_bank: 'Banco de la Produccion S.A. (PRODUBANCO)',
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-      processor_merchant_id: '111',
-      taxes: {
-        agenciaDeViaje: 0,
-        iac: 0,
-        tasaAeroportuaria: 0,
-      },
-      transaction_card_id: '6420c5bd-5a3f-45d2-8ac4-88de7b09958d',
-    },
-    {
-      masked_credit_card: '545195XXXXXX5480',
-      created: '2025-02-04T15:58:44.302Z',
-      metadata: '{"contractID":"157AB"}',
-      approved_transaction_amount: 500,
-      contact_details: {
-        email: 'manuel.guerrero@kushkipagos.com',
-      },
-      country: 'Mexico',
-      credential_alias: 'Alias1',
-      credential_id: '22c33a81f145415cb200ab8139603a51',
-      currency_code: 'MXN',
-      ice_value: 0,
-      iva_value: 0,
-      merchant_id: '20000000106554380000',
-      merchant_name: 'TW Mexico',
-      payment_method: 'CARD',
-      payment_submethod: 'CARD NO PRESENT',
-      processor_id: '6000000000172166121420424728',
-      processor_name: 'Prosa Processor',
-      processor_type: 'gateway',
-      public_credential_id: 'd5713887dc434cc4bb873781e46e10ca',
-      request_amount: 500,
-      response_code: '000',
-      response_text: 'Transacción aprobada',
-      sale_approval_code: '000000',
-      sale_ticket_number: '029184246439606168',
-      sale_transaction_type: 'SALE',
-      subtotal_iva: 500,
-      subtotal_iva0: 0,
-      ticket_number: '661738684712571670',
-      transaction_id: '700011575252919092',
-      transaction_reference: '2052742c-97dc-4d8a-b7b0-27bf4eafcc0a',
-      transaction_status: 'APPROVED',
-      transaction_type: 'VOID',
-      tax_id: '1234567890123',
-      approval_code: null,
-      bin_card: '545195',
-      card_country: 'Ecuador',
-      card_country_code: 'EC',
-      card_holder_name: 'John Doe',
-      card_type: 'Credit',
-      foreign_card: true,
-      last_four_digits: '5480',
-      payment_brand: 'Mastercard',
-      processor_code: '000',
-      processor_merchant_id: '111',
-      processor_message: 'Transacción aprobada',
-      recap: null,
-      transaction_card_id: null,
-      void_ticket_number: '661738684712571670',
-    },
-  ],
-};
-
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     approvedToday: 0,
@@ -297,18 +136,106 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  const [tempFromDate, setTempFromDate] = useState<string>('');
+  const [tempToDate, setTempToDate] = useState<string>('');
+
+  const [useCustomRange, setUseCustomRange] = useState(false);
 
   useEffect(() => {
-    loadDashboardData();
-    const interval = setInterval(loadDashboardData, 30000);
-    return () => clearInterval(interval);
+    // Initialize dates based on timeRange
+    const to = new Date();
+    const from = new Date();
+
+    if (timeRange === '7d') {
+      from.setDate(from.getDate() - 7);
+    } else if (timeRange === '30d') {
+      from.setDate(from.getDate() - 30);
+    } else if (timeRange === '90d') {
+      from.setDate(from.getDate() - 90);
+    }
+
+    setFromDate(from.toISOString().split('T')[0]);
+    setToDate(to.toISOString().split('T')[0]);
+
+    setTempFromDate(from.toISOString().split('T')[0]);
+    setTempToDate(to.toISOString().split('T')[0]);
   }, [timeRange]);
 
+  useEffect(() => {
+    if (fromDate && toDate) {
+      loadDashboardData();
+    }
+  }, [fromDate, toDate]);
+
+  // useEffect(() => {
+  //   const interval = setInterval(loadDashboardData, 30000);
+  //   return () => clearInterval(interval);
+  // }, []);
+
+  const formatDate = (initDate: string) => {
+    const date = new Date(initDate);
+    const formatted =
+      date.getFullYear() +
+      '-' +
+      String(date.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(date.getDate()).padStart(2, '0') +
+      'T' +
+      String(date.getHours()).padStart(2, '0') +
+      ':' +
+      String(date.getMinutes()).padStart(2, '0') +
+      ':' +
+      String(date.getSeconds()).padStart(2, '0') +
+      '.000';
+
+    return formatted;
+  };
+
+  const applyCustomDateRange = () => {
+    setFromDate(tempFromDate);
+    setToDate(tempToDate);
+  };
+
   const loadDashboardData = async () => {
+    if (!fromDate || !toDate) return;
+
+    setLoading(true);
     try {
-      // In production, replace with: const response = await fetch('/api/transactions');
-      // const apiData: TransactionAPIResponse = await response.json();
-      const apiData = mockAPIData;
+      const fromDateTime = new Date(fromDate);
+      fromDateTime.setHours(0, 0, 0, 0);
+
+      const toDateTime = new Date(toDate);
+      toDateTime.setHours(23, 59, 59, 999);
+
+      const result = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-transactions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            from_date: formatDate(String(fromDateTime)),
+            to_date: formatDate(String(toDateTime)),
+          }),
+        }
+      );
+
+      const data = await result.json();
+      console.log(data);
+
+      if (!data || !data.data) {
+        throw new Error('No data received from API');
+      }
+
+      const apiData: TransactionAPIResponse = {
+        total: data.total || data.data.length,
+        data: data.data,
+      };
 
       const transactions = apiData.data;
       const today = new Date();
@@ -559,17 +486,6 @@ export default function Dashboard() {
     }));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Cargando estadísticas...</p>
-        </div>
-      </div>
-    );
-  }
-
   const maxMonthlyAmount = Math.max(...stats.monthlyComparison.map((m) => m.amount), 1);
   const maxHourlyCount = Math.max(...stats.hourlyStats.map((h) => h.count), 1);
   const maxDailyAmount = Math.max(...stats.dailyComparison.map((d) => d.amount), 1);
@@ -581,35 +497,107 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {loading && (
+        <div className="fixed inset-0 flex items-center justify-center h-screen w-screen bg-white/20 backdrop-blur-sm z-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Cargando estadísticas...</p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Resumen de actividad en tiempo real</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-4 py-2 rounded-lg border border-gray-200">
             <Activity className="w-4 h-4 animate-pulse text-green-500" />
             <span>Actualizado ahora</span>
           </div>
 
           <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
-            {(['7d', '30d', '90d'] as const).map((range) => (
+            {(['7d', '30d', '90d', 'custom'] as const).map((range) => (
               <button
                 key={range}
-                onClick={() => setTimeRange(range)}
+                onClick={() => {
+                  if (range === 'custom') {
+                    setUseCustomRange(true);
+                  } else {
+                    setUseCustomRange(false);
+                    setTimeRange(range);
+                  }
+                }}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                  timeRange === range
+                  (range === 'custom' && useCustomRange) || (range === timeRange && !useCustomRange)
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                {range === '7d' ? '7 días' : range === '30d' ? '30 días' : '90 días'}
+                {range === '7d'
+                  ? '7 días'
+                  : range === '30d'
+                  ? '30 días'
+                  : range === '90d'
+                  ? '90 días'
+                  : 'Personalizado'}
               </button>
             ))}
           </div>
         </div>
       </div>
+
+      {useCustomRange && (
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fecha Inicial</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setTempFromDate(e.target.value)}
+                  max={toDate}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fecha Final</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setTempToDate(e.target.value)}
+                  min={fromDate}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={applyCustomDateRange}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2 justify-center"
+            >
+              <Activity className="w-4 h-4" />
+              Actualizar
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+            <span className="font-medium">Rango seleccionado:</span>
+            <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
+              {new Date(fromDate).toLocaleDateString('es-MX')} -{' '}
+              {new Date(toDate).toLocaleDateString('es-MX')}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 rounded-2xl p-6 text-white shadow-xl transform hover:scale-105 transition-all duration-300">
@@ -894,7 +882,7 @@ export default function Dashboard() {
 
               <path
                 d={`M 0 ${
-                  200 - (stats.monthlyComparison[0].amount / maxMonthlyAmount) * 180
+                  200 - (stats.monthlyComparison[0]?.amount / maxMonthlyAmount) * 180
                 } ${stats.monthlyComparison
                   .map(
                     (month, i) =>
@@ -909,7 +897,7 @@ export default function Dashboard() {
 
               <path
                 d={`M 0 ${
-                  200 - (stats.monthlyComparison[0].amount / maxMonthlyAmount) * 180
+                  200 - (stats.monthlyComparison[0]?.amount / maxMonthlyAmount) * 180
                 } ${stats.monthlyComparison
                   .map(
                     (month, i) =>

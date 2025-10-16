@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,13 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Upload as UploadIcon, FileSpreadsheet, AlertCircle } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Toaster } from '@/components/ui/toaster';
+
+import { Progress } from '@/components/ui/progress';
 
 const BulkChargeUpload = () => {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0, successful: 0, failed: 0 });
+  const [errors, setErrors] = useState<Array<{ row: number; error: string }>>([]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -33,6 +38,83 @@ const BulkChargeUpload = () => {
     }
 
     setFile(selectedFile);
+    setErrors([]);
+    setProgress({ current: 0, total: 0, successful: 0, failed: 0 });
+  };
+
+  const createKushkiToken = async (schedule: any) => {
+    try {
+      const tokenRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-kushki-token`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            cardholderName: schedule.cardholder_name,
+            cardNumber: schedule.card_number,
+            expiryMonth: schedule.expiryMonth?.toString(),
+            expiryYear: schedule.expiryYear?.toString(),
+            currency: schedule.currency,
+          }),
+        }
+      );
+
+      if (!tokenRes.ok) {
+        const errorData = await tokenRes.json();
+        throw new Error(errorData.message || 'Failed to create Kushki token');
+      }
+
+      const tokenData = await tokenRes.json();
+      return tokenData.token;
+    } catch (error) {
+      throw new Error(`Token creation failed: ${(error as Error).message}`);
+    }
+  };
+
+  const createSubscription = async (kushkiToken: string, schedule: any) => {
+    try {
+      const subRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-subscription`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            token: kushkiToken,
+            planName: 'Premium',
+            periodicity: 'monthly',
+            contactDetails: {
+              email: schedule.email,
+              firstName: schedule.first_name || 'First',
+              lastName: schedule.last_name || 'Last',
+            },
+            amount: {
+              subtotalIva: 1,
+              subtotalIva0: schedule.amount,
+              iva: 1,
+              ice: 1,
+              currency: schedule.currency,
+            },
+            startDate: new Date().toISOString().slice(0, 10),
+          }),
+        }
+      );
+
+      if (!subRes.ok) {
+        const errorData = await subRes.json();
+        throw new Error(errorData.message || 'Failed to create subscription');
+      }
+
+      const subscriptionResult = await subRes.json();
+      return subscriptionResult;
+    } catch (error) {
+      throw new Error(`Subscription creation failed: ${(error as Error).message}`);
+    }
   };
 
   const handleUpload = async () => {
@@ -46,7 +128,8 @@ const BulkChargeUpload = () => {
     }
 
     setUploading(true);
-    const startTime = performance.now();
+    setErrors([]);
+    const errorList: Array<{ row: number; error: string }> = [];
 
     try {
       // 1. Get logged-in user
@@ -63,7 +146,9 @@ const BulkChargeUpload = () => {
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
       if (rows.length === 0) throw new Error('Excel file is empty');
 
-      // 4. Prepare customer payload
+      setProgress({ current: 0, total: rows.length, successful: 0, failed: 0 });
+
+      // 3. Prepare customer payload
       const customersPayload = rows
         .map((r) => ({
           name: `${r['FIRST NAME'] || ''} ${r['LAST NAME'] || ''}`.trim(),
@@ -79,7 +164,7 @@ const BulkChargeUpload = () => {
         }))
         .filter((c) => c.email);
 
-      // 5. Upsert customers
+      // 4. Upsert customers
       const { data: upsertedCustomers, error: upsertError } = await supabase
         .from('customers')
         .upsert(customersPayload, { onConflict: 'email' })
@@ -93,7 +178,7 @@ const BulkChargeUpload = () => {
         if (c.email) customerMap[c.email] = c.id;
       });
 
-      // 6. Create collection job
+      // 5. Create collection job
       const { data: job, error: jobError } = await supabase
         .from('collection_jobs')
         .insert({
@@ -110,53 +195,94 @@ const BulkChargeUpload = () => {
 
       if (jobError) throw jobError;
 
-      // 7. Prepare schedules
-      const now = new Date().toISOString();
-      const schedulesPayload = rows
-        .filter((r) => customerMap[r['EMAIL']?.toString().trim()])
-        .map((r) => ({
-          customer_id: customerMap[r['EMAIL']?.toString().trim()],
-          collection_job_id: job.id,
-          amount: Number(r['AMOUNT'] || 0),
-          currency: r['CURRENCY'] || 'USD',
-          start_date: r['START DATE'] || null,
-          time_of_day: r['TIME'] || null,
-          frequency: (r['FREQUENCY'] || 'monthly').toLowerCase(),
-          attempts: Number(r['ATTEMPTS'] || 1),
-          attempt_interval_minutes: Number(r['ATTEMPTS TIME ON MINUTES'] || 5),
-          reference: r['REFERENCE'] || '',
-          status: 'inactive',
-          card_number: r['CARD NUMBER']?.toString() || '',
-          cardholder_name: r['CARDHOLDER NAME'] || '',
-          movement: r['MOVEMENT'] || '',
-          expiryMonth: r['EXPIRATION MONTH'] || '',
-          expiryYear: r['EXPIRATION YEAR'] || '',
-          first_name: `${r['FIRST NAME'] || ''}`,
-          last_name: `${r['LAST NAME'] || ''}`,
-          email: r['EMAIL']?.toString().trim() || null,
-          address: r['ADDRESS'] || null,
-          city: r['CITY'] || null,
-          country: r['COUNTRY'] || null,
-          kushki_token: null,
-          subscriptionId: null,
-          bin: null,
-          last4: r['CARD NUMBER']?.toString().slice(-4) || null,
-          brand: null,
-          created_at: now,
-          updated_at: now,
-        }));
+      // 6. Process each row with Kushki API
+      let successCount = 0;
+      let failCount = 0;
 
-      // 8. Insert schedules
-      const { error: scheduleError } = await supabase.from('schedules').insert(schedulesPayload);
-      if (scheduleError) throw scheduleError;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const email = r['EMAIL']?.toString().trim();
 
-      const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+        if (!customerMap[email]) {
+          errorList.push({ row: i + 2, error: 'Customer not found in database' });
+          failCount++;
+          setProgress({
+            current: i + 1,
+            total: rows.length,
+            successful: successCount,
+            failed: failCount,
+          });
+          continue;
+        }
+
+        try {
+          // Prepare schedule data
+          const scheduleData = {
+            customer_id: customerMap[email],
+            collection_job_id: job.id,
+            amount: Number(r['AMOUNT'] || 0),
+            currency: r['CURRENCY'] || 'USD',
+            start_date: r['START DATE'] || null,
+            time_of_day: r['TIME'] || null,
+            frequency: (r['FREQUENCY'] || 'monthly').toLowerCase(),
+            attempts: Number(r['ATTEMPTS'] || 1),
+            attempt_interval_minutes: Number(r['ATTEMPTS TIME ON MINUTES'] || 5),
+            reference: r['REFERENCE'] || '',
+            status: 'inactive',
+            card_number: r['CARD NUMBER']?.toString() || '',
+            cardholder_name: r['CARDHOLDER NAME'] || '',
+            movement: r['MOVEMENT'] || '',
+            expiryMonth: r['EXPIRATION MONTH'] || '',
+            expiryYear: r['EXPIRATION YEAR'] || '',
+            first_name: r['FIRST NAME'] || '',
+            last_name: r['LAST NAME'] || '',
+            email: email,
+            address: r['ADDRESS'] || null,
+            city: r['CITY'] || null,
+            country: r['COUNTRY'] || null,
+            kushki_token: null,
+            subscriptionId: null,
+            bin: null,
+            last4: r['CARD NUMBER']?.toString().slice(-4) || null,
+            brand: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          // Create Kushki token
+          const kushkiToken = await createKushkiToken(scheduleData);
+          scheduleData.kushki_token = kushkiToken;
+
+          // Create subscription
+          const subscription = await createSubscription(kushkiToken, scheduleData);
+          scheduleData.subscriptionId = subscription.subscriptionId || subscription.id;
+
+          successCount++;
+        } catch (error) {
+          console.error(`Error processing row ${i + 2}:`, error);
+          errorList.push({ row: i + 2, error: (error as Error).message });
+          failCount++;
+        }
+
+        setProgress({
+          current: i + 1,
+          total: rows.length,
+          successful: successCount,
+          failed: failCount,
+        });
+      }
+
       toast({
-        title: 'Upload successful',
-        description: `${file.name} processed (${rows.length} entries) in ${duration}s`,
+        title: 'Processing complete',
+        description: `Successfully processed ${successCount} out of ${rows.length} entries. ${
+          failCount > 0 ? `${failCount} failed.` : ''
+        }`,
+        variant: successCount === rows.length ? 'default' : 'destructive',
       });
 
-      setFile(null);
+      if (successCount === rows.length) {
+        setFile(null);
+      }
     } catch (err) {
       console.error(err);
       toast({
@@ -179,18 +305,19 @@ const BulkChargeUpload = () => {
         </p>
       </div>
 
+      <Toaster />
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           NÚMERO DE TARJETA, FECHA DE VENCIMIENTO, MES, AÑO DE VENCIMIENTO, NOMBRE DEL TITULAR DE LA
           TARJETA, NOMBRE, APELLIDO, CORREO ELECTRÓNICO, DIRECCIÓN, CIUDAD, PAÍS, MONTO, MONEDA,
-          FECHA DE INICIO, HORA, INTENTOS, TIEMPO DE INTENTOS EN MINUTOS, MOVIMIENTO, REFERENCIA
+          FECHA DE INICIO, HORA, INTENTOS, TIEMPO DE INTENTOS EN MINUTOS, MOVIMIENTO, REFERENCIA
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
-          <CardTitle></CardTitle>
+          <CardTitle>Upload File</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
@@ -203,13 +330,13 @@ const BulkChargeUpload = () => {
                     {(file.size / 1024).toFixed(2)} KB
                   </p>
                 </div>
-                <Button variant="outline" onClick={() => setFile(null)}>
+                <Button variant="outline" onClick={() => setFile(null)} disabled={uploading}>
                   Remove File
                 </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                <UploadIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                 <div>
                   <Label htmlFor="file-upload" className="cursor-pointer">
                     <span className="text-primary hover:underline">Choose a file</span>
@@ -227,9 +354,53 @@ const BulkChargeUpload = () => {
             )}
           </div>
 
-          <Button onClick={handleUpload} disabled={!file || uploading} className="w-full">
-            {uploading ? 'Processing...' : 'Upload and Process'}
-          </Button>
+          {uploading && progress.total > 0 && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>
+                  Processing: {progress.current} / {progress.total}
+                </span>
+                <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+              </div>
+              <Progress value={(progress.current / progress.total) * 100} />
+              <div className="flex gap-4 text-sm">
+                <span className="flex items-center gap-1 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  Successful: {progress.successful}
+                </span>
+                <span className="flex items-center gap-1 text-red-600">
+                  <XCircle className="h-4 w-4" />
+                  Failed: {progress.failed}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="w-full text-center">
+            <button
+              onClick={handleUpload}
+              className={`px-4 py-2 rounded-md transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300`}
+              disabled={!file || uploading}
+            >
+              {uploading ? 'Processing...' : 'Upload and Process'}
+            </button>
+          </div>
+
+          {errors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="font-semibold mb-2">Errors encountered:</div>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {errors.map((err, idx) => (
+                    <div key={idx} className="text-sm">
+                      Row {err.row}: {err.error}
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     </div>

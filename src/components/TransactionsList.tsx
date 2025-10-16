@@ -104,9 +104,6 @@ export default function TransactionsList() {
     const toDateTime = new Date(toDateToUse);
     toDateTime.setHours(23, 59, 59, 999);
 
-    const fromDates = fromDateTime.toISOString();
-    const toDates = toDateTime.toISOString();
-
     try {
       const result = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-transactions`,
