@@ -9,7 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Toaster } from '@/components/ui/toaster';
-
 import { Progress } from '@/components/ui/progress';
 
 const BulkChargeUpload = () => {
@@ -18,11 +17,9 @@ const BulkChargeUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, successful: 0, failed: 0 });
   const [errors, setErrors] = useState<Array<{ row: number; error: string }>>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
+  const validateFile = (selectedFile: File) => {
     const validTypes = [
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -34,12 +31,48 @@ const BulkChargeUpload = () => {
         title: 'Invalid file type',
         description: 'Please upload an Excel file (.xls or .xlsx)',
       });
-      return;
+      return false;
     }
 
-    setFile(selectedFile);
-    setErrors([]);
-    setProgress({ current: 0, total: 0, successful: 0, failed: 0 });
+    return true;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    if (validateFile(selectedFile)) {
+      setFile(selectedFile);
+      setErrors([]);
+      setProgress({ current: 0, total: 0, successful: 0, failed: 0 });
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (!droppedFile) return;
+
+    if (validateFile(droppedFile)) {
+      setFile(droppedFile);
+      setErrors([]);
+      setProgress({ current: 0, total: 0, successful: 0, failed: 0 });
+    }
   };
 
   const createKushkiToken = async (schedule: any) => {
@@ -132,14 +165,12 @@ const BulkChargeUpload = () => {
     const errorList: Array<{ row: number; error: string }> = [];
 
     try {
-      // 1. Get logged-in user
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('User not logged in');
 
-      // 2. Parse Excel
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -148,7 +179,6 @@ const BulkChargeUpload = () => {
 
       setProgress({ current: 0, total: rows.length, successful: 0, failed: 0 });
 
-      // 3. Prepare customer payload
       const customersPayload = rows
         .map((r) => ({
           name: `${r['FIRST NAME'] || ''} ${r['LAST NAME'] || ''}`.trim(),
@@ -164,7 +194,6 @@ const BulkChargeUpload = () => {
         }))
         .filter((c) => c.email);
 
-      // 4. Upsert customers
       const { data: upsertedCustomers, error: upsertError } = await supabase
         .from('customers')
         .upsert(customersPayload, { onConflict: 'email' })
@@ -172,13 +201,11 @@ const BulkChargeUpload = () => {
 
       if (upsertError) throw upsertError;
 
-      // Map email → customer_id
       const customerMap: Record<string, string> = {};
       upsertedCustomers.forEach((c) => {
         if (c.email) customerMap[c.email] = c.id;
       });
 
-      // 5. Create collection job
       const { data: job, error: jobError } = await supabase
         .from('collection_jobs')
         .insert({
@@ -195,7 +222,6 @@ const BulkChargeUpload = () => {
 
       if (jobError) throw jobError;
 
-      // 6. Process each row with Kushki API
       let successCount = 0;
       let failCount = 0;
 
@@ -216,7 +242,6 @@ const BulkChargeUpload = () => {
         }
 
         try {
-          // Prepare schedule data
           const scheduleData = {
             customer_id: customerMap[email],
             collection_job_id: job.id,
@@ -249,11 +274,9 @@ const BulkChargeUpload = () => {
             updated_at: new Date().toISOString(),
           };
 
-          // Create Kushki token
           const kushkiToken = await createKushkiToken(scheduleData);
           scheduleData.kushki_token = kushkiToken;
 
-          // Create subscription
           const subscription = await createSubscription(kushkiToken, scheduleData);
           scheduleData.subscriptionId = subscription.subscriptionId || subscription.id;
 
@@ -320,7 +343,14 @@ const BulkChargeUpload = () => {
           <CardTitle>Upload File</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             {file ? (
               <div className="space-y-4">
                 <FileSpreadsheet className="mx-auto h-12 w-12 text-green-500" />
@@ -338,6 +368,10 @@ const BulkChargeUpload = () => {
               <div className="space-y-4">
                 <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                 <div>
+                  <p className="text-lg font-medium mb-2">
+                    {isDragging ? 'Drop your file here' : 'Drag and drop your file here'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-3">or</p>
                   <Label htmlFor="file-upload" className="cursor-pointer">
                     <span className="text-primary hover:underline">Choose a file</span>
                   </Label>
