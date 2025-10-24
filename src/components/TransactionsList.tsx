@@ -37,6 +37,12 @@ const formatDate = (initDate: string) => {
   return formatted;
 };
 
+const addOneDay = (date: string | number | Date) => {
+  const newDate = new Date(date);
+  newDate.setDate(newDate.getDate() + 1);
+  return newDate;
+};
+
 const formatDisplayDate = (dateStr: string) => {
   const date = new Date(dateStr);
   const day = String(date.getDate()).padStart(2, '0');
@@ -344,8 +350,8 @@ export default function TransactionsList() {
 
         <div className="mt-3 text-sm text-gray-600">
           Mostrando transacciones desde{' '}
-          <span className="font-semibold">{new Date(tempFromDate).toLocaleDateString()}</span> hasta{' '}
-          <span className="font-semibold">{new Date(tempToDate).toLocaleDateString()}</span>
+          <span className="font-semibold">{addOneDay(tempFromDate).toLocaleDateString()}</span> hasta{' '}
+          <span className="font-semibold">{addOneDay(tempToDate).toLocaleDateString()}</span>
         </div>
       </div>
 
