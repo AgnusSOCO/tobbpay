@@ -238,16 +238,22 @@ export default function Dashboard() {
       };
 
       const transactions = apiData.data;
+      transactions.sort((a, b) => {
+        return new Date(b.created).getTime() - new Date(a.created).getTime();
+      });
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setDate(toDateTime.getDate() - 1);
 
       const lastWeek = new Date(today);
       lastWeek.setDate(lastWeek.getDate() - 7);
 
-      const todayTransactions = transactions.filter((t) => new Date(t.created) >= today);
+      const todayTransactions = transactions.filter(
+        (t) => new Date(t.created) >= fromDateTime || new Date(t.created) >= toDateTime
+      );
 
       const yesterdayTransactions = transactions.filter(
         (t) => new Date(t.created) >= yesterday && new Date(t.created) < today
@@ -557,24 +563,22 @@ export default function Dashboard() {
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="date"
-                  value={fromDate}
+                  value={tempFromDate}
                   onChange={(e) => setTempFromDate(e.target.value)}
-                  max={toDate}
+                  max={tempToDate}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
               </div>
             </div>
-
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">Fecha Final</label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="date"
-                  value={toDate}
+                  value={tempToDate}
                   onChange={(e) => setTempToDate(e.target.value)}
-                  min={fromDate}
-                  max={new Date().toISOString().split('T')[0]}
+                  min={tempFromDate}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
               </div>
@@ -592,8 +596,8 @@ export default function Dashboard() {
           <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
             <span className="font-medium">Rango seleccionado:</span>
             <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
-              {new Date(fromDate).toLocaleDateString('es-MX')} -{' '}
-              {new Date(toDate).toLocaleDateString('es-MX')}
+              {new Date(tempFromDate).toLocaleDateString('es-MX')} -{' '}
+              {new Date(tempToDate).toLocaleDateString('es-MX')}
             </span>
           </div>
         </div>
@@ -768,10 +772,7 @@ export default function Dashboard() {
                       {transaction.currency_code}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {new Date(transaction.created).toLocaleTimeString('es-MX', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {new Date(transaction.created).toLocaleString()}
                     </p>
                   </div>
                 </div>

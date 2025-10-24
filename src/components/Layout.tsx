@@ -34,6 +34,12 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
       color: 'from-emerald-500 to-emerald-600',
     },
     { id: 'upload', label: 'Carga Masiva', icon: Upload, color: 'from-orange-500 to-orange-600' },
+    {
+      id: 'scheduled',
+      label: 'Cargo programado',
+      icon: CreditCard,
+      color: 'from-orange-500 to-orange-600',
+    },
   ];
 
   return (

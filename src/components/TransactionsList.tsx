@@ -123,8 +123,12 @@ export default function TransactionsList() {
       const data = await result.json();
 
       console.log(data);
-      if (data) {
-        setTransactions(transformData(data.data));
+      if (data.data) {
+        const transactionList = data.data;
+        transactionList.sort((a, b) => {
+          return new Date(b.created).getTime() - new Date(a.created).getTime();
+        });
+        setTransactions(transformData(transactionList));
       }
     } catch (error) {
       console.error('Error loading transactions:', error);
@@ -163,19 +167,9 @@ export default function TransactionsList() {
   };
 
   const handleResetDateRange = () => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const firstDayStr = firstDay.toISOString().split('T')[0];
-    const lastDayStr = lastDay.toISOString().split('T')[0];
-
-    setTempFromDate(firstDayStr);
-    setTempToDate(lastDayStr);
-    setFromDate(firstDayStr);
-    setToDate(lastDayStr);
+    setTempFromDate(fromDate);
+    setTempToDate(toDate);
     setShowDatePicker(false);
-    loadTransactions(firstDayStr, lastDayStr);
   };
 
   const exportToCSV = () => {
@@ -298,7 +292,9 @@ export default function TransactionsList() {
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-800">Rango de Fechas</h3>
                   <button
-                    onClick={() => setShowDatePicker(false)}
+                    onClick={() => {
+                      setShowDatePicker(false), handleResetDateRange();
+                    }}
                     className="text-gray-500 hover:text-gray-700"
                   >
                     <X className="w-5 h-5" />
@@ -348,8 +344,8 @@ export default function TransactionsList() {
 
         <div className="mt-3 text-sm text-gray-600">
           Mostrando transacciones desde{' '}
-          <span className="font-semibold">{formatDisplayDate(fromDate)}</span> hasta{' '}
-          <span className="font-semibold">{formatDisplayDate(toDate)}</span>
+          <span className="font-semibold">{formatDisplayDate(tempFromDate)}</span> hasta{' '}
+          <span className="font-semibold">{formatDisplayDate(tempToDate)}</span>
         </div>
       </div>
 

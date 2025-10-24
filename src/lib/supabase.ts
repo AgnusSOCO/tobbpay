@@ -26,20 +26,31 @@ export type Transaction = {
 
 export type ScheduledCharge = {
   id: string;
-  batch_name: string;
-  customer_name: string;
+  customer_id: string;
   amount: number;
   currency: string;
+  start_date: string;
+  frequency: string;
+  attempts: number;
+  status: 'active' | 'inactive';
+  subscriptionId?: string | null;
+  customers: {
+    name: string;
+    email: string;
+    kushki_token?: string;
+  } | null;
+  address: string;
+  first_name: string;
+  last_name: string;
+  bin: string;
+  brand: string;
+  city: string;
+  country: string;
+  email: string;
+  kushki_token: string;
+  last4: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  cardholder_name: string;
   card_number: string;
-  card_expiry_month: string;
-  card_expiry_year: string;
-  cvv: string;
-  retry_attempts: number;
-  retry_interval_minutes: number;
-  current_attempt: number;
-  last_attempt_at: string | null;
-  next_attempt_at: string | null;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  created_at: string;
-  uploaded_by: string;
 };

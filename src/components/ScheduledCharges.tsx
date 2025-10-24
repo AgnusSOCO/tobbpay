@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Play, Trash2, RefreshCw } from 'lucide-react';
+import { X, RefreshCw, Check } from 'lucide-react';
 import { supabase, ScheduledCharge } from '../lib/supabase';
-
+import { format } from 'date-fns';
 export default function ScheduledCharges() {
   const [charges, setCharges] = useState<ScheduledCharge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,8 +15,18 @@ export default function ScheduledCharges() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('scheduled_charges')
-        .select('*')
+        .from('schedules')
+        .select(
+          `
+        *,
+        customers (
+          name,
+          email,
+          kushki_token
+        )
+      `,
+          { count: 'exact' }
+        )
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -28,78 +38,136 @@ export default function ScheduledCharges() {
     }
   };
 
-  const executeCharge = async (chargeId: string) => {
-    setProcessing(true);
-    try {
-      const charge = charges.find(c => c.id === chargeId);
-      if (!charge) return;
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-charge`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ chargeId }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al procesar el cargo');
-      }
-
-      await loadCharges();
-    } catch (error: any) {
-      alert(error.message || 'Error al ejecutar el cargo');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const deleteCharge = async (chargeId: string) => {
-    if (!confirm('¿Está seguro de eliminar este cargo programado?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('scheduled_charges')
-        .delete()
-        .eq('id', chargeId);
-
-      if (error) throw error;
-      await loadCharges();
-    } catch (error: any) {
-      alert(error.message || 'Error al eliminar el cargo');
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const styles = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-red-100 text-red-800',
     };
     const labels = {
-      pending: 'Pendiente',
-      processing: 'Procesando',
-      completed: 'Completado',
-      failed: 'Fallido',
+      active: 'Completado',
+      inactive: 'Fallido',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          styles[status as keyof typeof styles]
+        }`}
+      >
         {labels[status as keyof typeof labels]}
       </span>
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Cargando cargos programados...</div>
-      </div>
-    );
-  }
+  const executeCharge = async (chargeId: string, status: string) => {
+    setProcessing(true);
+    const chosen = charges.find((c) => c.id === chargeId);
+    if (!chosen) {
+      setProcessing(false);
+      return;
+    }
+
+    if (status === 'active' && chosen.subscriptionId === null) {
+      try {
+        // 1. Create Kushki token
+        const tokenRes = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-kushki-token`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              cardholderName: chosen.cardholder_name,
+              cardNumber: chosen.card_number,
+              expiryMonth: chosen.expiryMonth?.toString(),
+              expiryYear: chosen.expiryYear?.toString(),
+              currency: chosen.currency,
+            }),
+          }
+        );
+
+        const tokenData = await tokenRes.json();
+        const kushkiToken = tokenData.token;
+        console.log('Generated Kushki token:', tokenData);
+
+        // 2. Use token to create subscription
+        const subRes = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-subscription`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              token: kushkiToken,
+              planName: 'Premium',
+              periodicity: 'monthly',
+              contactDetails: {
+                email: chosen.email,
+                firstName: chosen.first_name || 'First',
+                lastName: chosen.last_name || 'Last',
+              },
+
+              amount: {
+                subtotalIva: 1,
+                subtotalIva0: chosen.amount,
+                iva: 1,
+                ice: 1,
+                currency: chosen.currency,
+              },
+              startDate: new Date().toISOString().slice(0, 10),
+            }),
+          }
+        );
+
+        const subscriptionResult = await subRes.json();
+        console.log('Created subscription:', subscriptionResult);
+
+        if (subRes.ok) {
+          await supabase
+            .from('schedules')
+            .update({
+              status: 'active',
+              subscriptionId: subscriptionResult.subscriptionId,
+            })
+            .eq('id', chosen.id);
+        }
+      } catch (err) {
+        console.error('Error activating schedule', chosen.id, err);
+      }
+    } else if (status === 'inactive' && chosen.subscriptionId !== null) {
+      const inactiveRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/inactive-schedule`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            subscriptionId: chosen.subscriptionId,
+          }),
+        }
+      );
+
+      await inactiveRes.text();
+
+      if (inactiveRes.ok) {
+        await supabase
+          .from('schedules')
+          .update({
+            status: 'inactive',
+            subscriptionId: null,
+          })
+          .eq('id', chosen.id);
+      }
+    }
+
+    await loadCharges();
+    setProcessing(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -122,13 +190,16 @@ export default function ScheduledCharges() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Lote
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Cliente
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Monto
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fecha de inicio
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Frecuencia
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Intentos
@@ -137,63 +208,69 @@ export default function ScheduledCharges() {
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Próximo Intento
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {charges.length > 0 ? (
-                charges.map((charge) => (
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <div className="rounded-lg p-8 flex flex-row items-center justify-center gap-2">
+                      <div className="w-7 h-7 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="text-gray-400 text-lg font-semibold">Cargando datos...</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                charges.length > 0 &&
+                charges.map((charge: ScheduledCharge) => (
                   <tr key={charge.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {charge.batch_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {charge.customer_name}
+                      {charge.customers?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       ${charge.amount.toFixed(2)} {charge.currency}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {charge.current_attempt} / {charge.retry_attempts}
+                      {format(new Date(charge.start_date), 'MMM dd, yyyy')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(charge.status)}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{charge.frequency}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {charge.next_attempt_at ? (
-                        new Date(charge.next_attempt_at).toLocaleString('es-MX')
-                      ) : (
-                        '-'
-                      )}
+                      {charge.attempts}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {getStatusBadge(charge.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
-                        {charge.status === 'pending' && (
+                        {charge.status === 'inactive' && (
                           <button
-                            onClick={() => executeCharge(charge.id)}
+                            onClick={() => executeCharge(charge.id, 'active')}
                             disabled={processing}
-                            className="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400"
-                            title="Ejecutar cargo"
+                            className="flex items-center p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                            title="Activar"
                           >
-                            <Play className="w-4 h-4" />
+                            <Check className="w-4 h-4" />
+                            Activar
                           </button>
                         )}
-                        <button
-                          onClick={() => deleteCharge(charge.id)}
-                          className="p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {charge.status === 'active' && (
+                          <button
+                            onClick={() => executeCharge(charge.id, 'inactive')}
+                            className="flex items-center p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                            title="Cancelar"
+                          >
+                            <X className="w-4 h-4" />
+                            Cancelar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))
-              ) : (
+                ))}
+              {!loading && charges.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                     No hay cargos programados
@@ -206,9 +283,7 @@ export default function ScheduledCharges() {
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="text-sm text-gray-600">
-          Total de cargos programados: {charges.length}
-        </div>
+        <div className="text-sm text-gray-600">Total de cargos programados: {charges.length}</div>
       </div>
     </div>
   );
