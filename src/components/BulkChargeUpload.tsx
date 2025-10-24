@@ -141,6 +141,9 @@ const BulkChargeUpload = () => {
       if (!subRes.ok) {
         const errorData = await subRes.json();
         throw new Error(errorData.message || 'Failed to create subscription');
+      } else {
+        const { error: scheduleError } = await supabase.from('schedules').insert(schedule);
+        if (scheduleError) throw scheduleError;
       }
 
       const subscriptionResult = await subRes.json();
@@ -253,7 +256,7 @@ const BulkChargeUpload = () => {
             attempts: Number(r['ATTEMPTS'] || 1),
             attempt_interval_minutes: Number(r['ATTEMPTS TIME ON MINUTES'] || 5),
             reference: r['REFERENCE'] || '',
-            status: 'inactive',
+            status: 'active',
             card_number: r['CARD NUMBER']?.toString() || '',
             cardholder_name: r['CARDHOLDER NAME'] || '',
             movement: r['MOVEMENT'] || '',
