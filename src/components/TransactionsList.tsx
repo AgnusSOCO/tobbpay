@@ -344,8 +344,8 @@ export default function TransactionsList() {
 
         <div className="mt-3 text-sm text-gray-600">
           Mostrando transacciones desde{' '}
-          <span className="font-semibold">{formatDisplayDate(tempFromDate)}</span> hasta{' '}
-          <span className="font-semibold">{formatDisplayDate(tempToDate)}</span>
+          <span className="font-semibold">{new Date(tempFromDate).toLocaleDateString()}</span> hasta{' '}
+          <span className="font-semibold">{new Date(tempToDate).toLocaleDateString()}</span>
         </div>
       </div>
 

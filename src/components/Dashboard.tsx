@@ -596,8 +596,8 @@ export default function Dashboard() {
           <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
             <span className="font-medium">Rango seleccionado:</span>
             <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
-              {new Date(tempFromDate).toLocaleDateString('es-MX')} -{' '}
-              {new Date(tempToDate).toLocaleDateString('es-MX')}
+              {new Date(tempFromDate).toLocaleDateString()} -{' '}
+              {new Date(tempToDate).toLocaleDateString()}
             </span>
           </div>
         </div>
