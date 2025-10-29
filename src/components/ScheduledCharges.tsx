@@ -1,19 +1,52 @@
 import { useEffect, useState } from 'react';
-import { X, RefreshCw, Check } from 'lucide-react';
+import { Search, X, RefreshCw, Check } from 'lucide-react';
 import { supabase, ScheduledCharge } from '../lib/supabase';
-import { format } from 'date-fns';
+import { format, sub } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
+
+type ExtendedScheduledCharge = ScheduledCharge & {
+  response_code: string;
+  response_text: string;
+};
+
 export default function ScheduledCharges() {
-  const [charges, setCharges] = useState<ScheduledCharge[]>([]);
+  const [charges, setCharges] = useState<ExtendedScheduledCharge[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-
+  const [filteredCharges, setFilteredCharges] = useState<ExtendedScheduledCharge[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast();
   useEffect(() => {
     loadCharges();
   }, []);
 
+  useEffect(() => {
+    applyFilters();
+  }, [charges, searchTerm]);
+
+  const applyFilters = () => {
+    let filtered = [...charges];
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (t) =>
+          (t.response_code?.toLowerCase() ?? '').includes(searchTerm.toLowerCase()) ||
+          (t.response_text?.toLowerCase() ?? '').includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredCharges(filtered);
+  };
+
   const loadCharges = async () => {
     setLoading(true);
     try {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
       const { data, error } = await supabase
         .from('schedules')
         .select(
@@ -30,12 +63,91 @@ export default function ScheduledCharges() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCharges(data || []);
+
+      if (data.length > 0) {
+        const result_charges = await Promise.all(
+          data.map(async (s, i) => {
+            const result_getting_transaction = await loadTransactionsAndGetRequiredField(
+              firstDay,
+              lastDay,
+              s.subscriptionId || '19283723232'
+            );
+
+            return { ...s, ...result_getting_transaction };
+          })
+        );
+
+        setCharges(result_charges);
+      }
     } catch (error) {
       console.error('Error loading scheduled charges:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadTransactionsAndGetRequiredField = async (
+    fromDate?: string,
+    toDate?: string,
+    subscription_id?: string
+  ): Promise<{ response_code: string; response_text: string } | undefined> => {
+    setLoading(true);
+
+    try {
+      const fromDateTime = new Date(fromDate ?? '');
+      fromDateTime.setHours(0, 0, 0, 0);
+
+      const toDateTime = new Date(toDate ?? '');
+      toDateTime.setHours(23, 59, 59, 999);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-transactions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            from_date: formatDate(String(fromDateTime)),
+            to_date: formatDate(String(toDateTime)),
+            subscription_id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      const latest = data?.data?.[data.data.length - 1] ?? {};
+
+      return {
+        response_code: latest.response_code ?? '',
+        response_text: latest.response_text ?? '',
+      };
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      return undefined;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (initDate: string) => {
+    const date = new Date(initDate);
+    const formatted =
+      date.getFullYear() +
+      '-' +
+      String(date.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(date.getDate()).padStart(2, '0') +
+      'T' +
+      String(date.getHours()).padStart(2, '0') +
+      ':' +
+      String(date.getMinutes()).padStart(2, '0') +
+      ':' +
+      String(date.getSeconds()).padStart(2, '0') +
+      '.000';
+
+    return formatted;
   };
 
   const getStatusBadge = (status: string) => {
@@ -89,7 +201,6 @@ export default function ScheduledCharges() {
 
         const tokenData = await tokenRes.json();
         const kushkiToken = tokenData.token;
-        console.log('Generated Kushki token:', tokenData);
 
         // 2. Use token to create subscription
         const subRes = await fetch(
@@ -123,9 +234,8 @@ export default function ScheduledCharges() {
         );
 
         const subscriptionResult = await subRes.json();
-        console.log('Created subscription:', subscriptionResult);
 
-        if (subRes.ok) {
+        if (subRes.ok && subscriptionResult.subscriptionId) {
           await supabase
             .from('schedules')
             .update({
@@ -133,6 +243,12 @@ export default function ScheduledCharges() {
               subscriptionId: subscriptionResult.subscriptionId,
             })
             .eq('id', chosen.id);
+        } else {
+          toast({
+            variant: 'destructive',
+            title: subscriptionResult.code,
+            description: subscriptionResult?.message,
+          });
         }
       } catch (err) {
         console.error('Error activating schedule', chosen.id, err);
@@ -172,17 +288,33 @@ export default function ScheduledCharges() {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">Cargos Programados</h2>
-          <button
-            onClick={loadCharges}
-            className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-            title="Actualizar"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-3">
+            {/* Search bar */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="ISO o respuesta"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-w py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <button
+              onClick={loadCharges}
+              className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+              title="Actualizar"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
+      <Toaster />
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
@@ -208,6 +340,12 @@ export default function ScheduledCharges() {
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ISO
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Respuesta
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
@@ -224,8 +362,8 @@ export default function ScheduledCharges() {
                 </tr>
               )}
               {!loading &&
-                charges.length > 0 &&
-                charges.map((charge: ScheduledCharge) => (
+                filteredCharges.length > 0 &&
+                filteredCharges.map((charge: ExtendedScheduledCharge) => (
                   <tr key={charge.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {charge.customers?.name || 'N/A'}
@@ -242,6 +380,12 @@ export default function ScheduledCharges() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {getStatusBadge(charge.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {charge.response_code}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {charge.response_text}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
@@ -270,7 +414,7 @@ export default function ScheduledCharges() {
                     </td>
                   </tr>
                 ))}
-              {!loading && charges.length === 0 && (
+              {!loading && filteredCharges.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                     No hay cargos programados
