@@ -153,6 +153,40 @@ const BulkChargeUpload = () => {
     }
   };
 
+  function isValidDate(dateStr: string) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateStr)) return false;
+
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(dateStr);
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() + 1 === month &&
+      date.getUTCDate() === day
+    );
+  }
+
+  function isValidTime(timeStr: string) {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/;
+    return timeRegex.test(timeStr);
+  }
+
+  function excelTimeToHMS(excelTime: string) {
+    const totalSeconds = Math.round(Number(excelTime) * 24 * 60 * 60);
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  function excelDateToYMD(excelDate: string) {
+    const jsDate = new Date((Number(excelDate) - 25569) * 86400 * 1000);
+    const year = jsDate.getUTCFullYear();
+    const month = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(jsDate.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   const handleUpload = async () => {
     if (!file) {
       toast({
@@ -250,8 +284,10 @@ const BulkChargeUpload = () => {
             collection_job_id: job.id,
             amount: Number(r['AMOUNT'] || 0),
             currency: r['CURRENCY'] || 'USD',
-            start_date: r['START DATE'] || null,
-            time_of_day: r['TIME'] || null,
+            start_date: isValidDate(r['START DATE'])
+              ? r['START DATE']
+              : excelDateToYMD(r['START DATE']) || null,
+            time_of_day: isValidTime(r['TIME']) ? r['TIME'] : excelTimeToHMS(r['TIME']) || null,
             frequency: (r['FREQUENCY'] || 'monthly').toLowerCase(),
             attempts: Number(r['ATTEMPTS'] || 1),
             attempt_interval_minutes: Number(r['ATTEMPTS TIME ON MINUTES'] || 5),
